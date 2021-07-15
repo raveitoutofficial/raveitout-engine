@@ -426,6 +426,14 @@ void ScoreKeeperNormal::HandleHoldCheckpointScore( const NoteData &nd, int iRow,
 	HandleTapNoteScoreInternal(iNumHoldsMissedThisRow == 0 ? TNS_CheckpointHit:TNS_CheckpointMiss,
 							   TNS_CheckpointHit, iRow);
 	HandleComboInternal( iNumHoldsHeldThisRow, 0, iNumHoldsMissedThisRow, iRow );
+
+    NSMAN->ReportScore(
+            m_pPlayerState->m_PlayerNumber,
+            iNumHoldsMissedThisRow == 0 ? TNS_CheckpointHit:TNS_CheckpointMiss,
+            m_pPlayerStageStats->m_iScore,
+            m_pPlayerStageStats->m_iCurCombo,
+            0
+    );
 }
 
 void ScoreKeeperNormal::HandleTapNoteScoreInternal( TapNoteScore tns, TapNoteScore maximum, int row )
@@ -651,7 +659,8 @@ int ScoreKeeperNormal::GetPossibleDancePoints( NoteData* nd, const TimingData* t
 	NoteDataUtil::CalculateRadarValues( *nd, fSongSeconds, radars );
 	
 	int ret = 0;
-	 
+
+	//This assumes holds will always be weighted the same as W1, which is incorrect. -RL
 	ret += int(radars[RadarCategory_TapsAndHolds]) * TapNoteScoreToDancePoints(TNS_W1, false);
 	if( GAMESTATE->GetCurrentGame()->m_bTickHolds ) ret += NoteDataUtil::GetTotalHoldTicks( nd, td ) * g_iPercentScoreWeight.GetValue(SE_CheckpointHit);
 	ret += int(radars[RadarCategory_Holds]) * HoldNoteScoreToDancePoints(HNS_Held, false);	

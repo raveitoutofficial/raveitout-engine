@@ -189,7 +189,35 @@ Grade PlayerStageStats::GetGrade() const
 	if( m_iStepsPlayed > 0 && !GAMESTATE->IsCourseMode() )
 		bIsBeginner = m_vpPossibleSteps[0]->GetDifficulty() == Difficulty_Beginner;
 
-	FOREACH_ENUM( TapNoteScore, tns )
+#ifdef NO_PAY_MODE
+    //PIU accuracy formula, goes up to 125%. However, it is never shown to the player.
+    //Accuracy = [(Perfect*1.2)+( Great*0.9)+(Good*0.6)+ (Max Combo*0.05) - (Bad*0.45)-(Miss*0.9)- (Longnote*0.2)] / Total
+
+    //For RP accuracy will be calculated based on possible weight and real weight.
+    float fPossible=0;
+	int maxPossibleWeight=ScoreKeeperNormal::TapNoteScoreToGradePoints( TNS_W1, bIsBeginner );
+    FOREACH_ENUM( TapNoteScore, tns )
+    {
+        if (ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, false ) == -999)
+            continue;
+        LOG->Trace("%s: %i * %i",TapNoteScoreToString(tns).c_str(),m_iTapNoteScores[tns],maxPossibleWeight);
+        fPossible += m_iTapNoteScores[tns] * maxPossibleWeight;
+    }
+    LOG->Trace("-------------------");
+    FOREACH_ENUM( TapNoteScore, tns )
+    {
+        int iTapScoreValue = ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, bIsBeginner );
+        if (ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, false ) == -999)
+            continue;
+        fActual += m_iTapNoteScores[tns] * iTapScoreValue;
+        LOG->Trace( "%s: %i * %i",TapNoteScoreToString(tns).c_str(), m_iTapNoteScores[tns], iTapScoreValue );
+    }
+
+    //No calculation of hold notes because they're weighted by 0
+    LOG->Trace("GetGrade: %f/%f",fActual,fPossible);
+    float fPercent = fActual/fPossible;
+#else
+    FOREACH_ENUM( TapNoteScore, tns )
 	{
 		int iTapScoreValue = ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, bIsBeginner );
 		fActual += m_iTapNoteScores[tns] * iTapScoreValue;
@@ -206,7 +234,7 @@ Grade PlayerStageStats::GetGrade() const
 	//LOG->Trace( "GetGrade: fActual: %f, fPossible: %d", fActual, m_iPossibleGradePoints );
 
 	float fPercent = (m_iPossibleGradePoints == 0) ? 0 : fActual / m_iPossibleGradePoints;
-
+#endif
 	Grade grade = GetGradeFromPercent( fPercent );
 
 	//LOG->Trace( "GetGrade: Grade: %s, %i", GradeToString(grade).c_str(), GRADE_TIER02_IS_ALL_W2S );
@@ -282,7 +310,31 @@ RString PlayerStageStats::FormatPercentScore( float fPercentDancePoints )
 
 float PlayerStageStats::GetPercentDancePoints() const
 {
+#ifdef NO_PAY_MODE
+    bool bIsBeginner = false;
+    if( m_iStepsPlayed > 0 && !GAMESTATE->IsCourseMode() )
+        bIsBeginner = m_vpPossibleSteps[0]->GetDifficulty() == Difficulty_Beginner;
+    int fActual   = 0;
+    int fPossible = 0;
+
+    int maxPossibleWeight=ScoreKeeperNormal::TapNoteScoreToDancePoints( TNS_W1, bIsBeginner );
+    FOREACH_ENUM( TapNoteScore, tns )
+    {
+        if (ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, false ) == -999)
+            continue;
+        fPossible += m_iTapNoteScores[tns] * maxPossibleWeight;
+    }
+    FOREACH_ENUM( TapNoteScore, tns )
+    {
+        int iTapScoreValue = ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, bIsBeginner );
+        if (ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, false ) == -999)
+            continue;
+        fActual += m_iTapNoteScores[tns] * iTapScoreValue;
+    }
+    return MakePercentScore(fActual,fPossible);
+#else
 	return MakePercentScore( m_iActualDancePoints, m_iPossibleDancePoints );
+#endif
 }
 
 float PlayerStageStats::GetCurMaxPercentDancePoints() const

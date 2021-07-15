@@ -161,6 +161,7 @@ void ScreenNetEvaluation::HandleScreenMessage( const ScreenMessage SM )
 			ON_COMMAND( m_textUsers[i] );
 			LOG->Trace( "SMNETCheckpoint%d", i );
 		}
+		MESSAGEMAN->Broadcast("SMNetGotEval"); //To update the lua scoreboard
 		return; // No need to let ScreenEvaluation get a hold of this.
 	}
 	else if( SM == SM_GoToNextScreen )
@@ -237,7 +238,27 @@ public:
         int player = IArg(1);
         if (player > p->GetNumActivePlayers())
             luaL_error( L, "%i out of bounds", player );
+
+        // Strange occurences because of timing cause these things not to
+        // work right and will sometimes cause a crash. We should make SURE
+        // we won't crash!
+        if ( size_t(player) >= NSMAN->m_EvalPlayerData.size() )
+        {
+            //This isn't entirely correct, the game can end before the server recieves any scores
+            //LOG->Warn("Server never sent any records after the song ended!");
+            lua_pushnil(L);
+            return 1;
+        }
+
         EndOfGame_PlayerData playerData = NSMAN->m_EvalPlayerData[player];
+
+        if ( size_t(playerData.name) >= NSMAN->m_PlayerNames.size() || playerData.name < 0)
+        {
+            //LOG->Warn("Player name sent from server is malformed!");
+            lua_pushnil(L);
+            return 1;
+        }
+
         lua_createtable(L, 6, 0); //size of struct
 
         lua_pushstring(L, NSMAN->m_PlayerNames[playerData.name].c_str());
@@ -254,7 +275,7 @@ public:
 
         //Turns out it only works with vectors
         //LuaHelpers::CreateTableFromArray<int>(playerData.tapScores, L);
-        lua_createtable(L, 8, 0); //NETNUMTAPSCORES=8 in NetworkSyncManager.h
+        lua_createtable(L, NETNUMTAPSCORES, 0);
         for (int i=0;i<8;++i)
         {
             lua_pushnumber(L,playerData.tapScores[i]);

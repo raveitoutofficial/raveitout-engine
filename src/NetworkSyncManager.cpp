@@ -817,9 +817,10 @@ void NetworkSyncManager::SelectUserSong()
 	m_packet.WriteNT( m_sArtist );
 	m_packet.WriteNT( m_sSubTitle );
 	//Send songhash
-	if (m_ServerVersion >= 129) {
+	//TODO: m_sFileHash will throw an exception
+	/*if (m_ServerVersion >= 129) {
 		m_packet.WriteNT(GAMESTATE->m_pCurSong->GetFileHash());
-	}
+	}*/
 	NetPlayerClient->SendPack( (char*)&m_packet.Data, m_packet.Position );
 }
 
@@ -842,6 +843,7 @@ SMOStepType NetworkSyncManager::TranslateStepType(int score)
 	case TNS_AvoidMine:
 		return SMOST_AVOIDMINE;
 	case TNS_Miss:
+	case TNS_CheckpointMiss:
 		return SMOST_MISS;
 	case TNS_W5:
 		return SMOST_W5;
@@ -851,8 +853,10 @@ SMOStepType NetworkSyncManager::TranslateStepType(int score)
 		return SMOST_W3;
 	case TNS_W2:
 		return SMOST_W2;
+    case TNS_CheckpointHit: //Pump counts it as a W1 -RL
 	case TNS_W1:
 		return SMOST_W1;
+    //Since hold and tap enums could have the same value, TapNoteScore_Invalid is added during online scoring to differentiate them
 	case HNS_LetGo+TapNoteScore_Invalid:
 		return SMOST_LETGO;
 	case HNS_Held+TapNoteScore_Invalid:
@@ -1088,12 +1092,14 @@ static bool ConnectToServer( const RString &t )
 
 extern Preference<RString> g_sLastServer;
 
+
 LuaFunction( ConnectToServer, 		ConnectToServer( ( RString(SArg(1)).length()==0 ) ? RString(g_sLastServer) : RString(SArg(1) ) ) )
 
 #endif
 
 static bool ReportStyle() { NSMAN->ReportStyle(); return true; }
 static bool CloseNetworkConnection() { NSMAN->CloseConnection(); return true; }
+
 
 LuaFunction( IsSMOnlineLoggedIn,	NSMAN->isSMOLoggedIn[Enum::Check<PlayerNumber>(L, 1)] )
 LuaFunction( IsNetConnected,		NSMAN->useSMserver )

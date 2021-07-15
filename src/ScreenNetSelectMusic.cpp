@@ -508,6 +508,11 @@ void ScreenNetSelectMusic::MusicChanged()
     m_vpSteps.clear();
     StepsType st = GAMESTATE->GetCurrentStyle(PLAYER_1)->m_StepsType;
     m_vpSteps = GAMESTATE->m_pCurSong->GetStepsByStepsType( st );
+    //This is a crappy hack to match how GetPlayableSteps sorts steps,
+    //because otherwise it would work based on the ordering in the ssc
+    //and it would jump everywhere when selecting a difficulty -RL
+    StepsUtil::SortNotesArrayByDifficulty( m_vpSteps );
+    StepsUtil::SortStepsByTypeAndDifficulty( m_vpSteps );
 
     //Copied straight from ScreenSelectMusic
     FOREACH_HumanPlayer( pn ) {
