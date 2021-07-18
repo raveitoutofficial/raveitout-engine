@@ -3088,9 +3088,18 @@ void ScreenGameplay::HandleScreenMessage( const ScreenMessage SM )
         /*GAMESTATE->CommitStageStats();
         STATSMAN->m_vPlayedStageStats.push_back( STATSMAN->m_CurStageStats );
         STATSMAN->CalcAccumPlayedStageStats();*/
-        this->SetPrevScreenName("ScreenFailedMenu");
-		GAMESTATE->CancelStage(); //Give tokens back
-        m_Failed.StartTransitioning( SM_DoPrevScreen );
+
+        if( GAMESTATE->IsAnExtraStage() )
+        {
+
+            m_Failed.StartTransitioning( SM_DoNextScreen );
+        }
+        else
+        {
+            this->SetPrevScreenName("ScreenFailedMenu");
+            GAMESTATE->CancelStage(); //Give tokens back
+            m_Failed.StartTransitioning( SM_DoPrevScreen );
+        }
 #else
 		m_Failed.StartTransitioning( SM_DoNextScreen );
 #endif
