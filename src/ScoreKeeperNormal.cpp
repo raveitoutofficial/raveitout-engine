@@ -736,7 +736,11 @@ int ScoreKeeperNormal::TapNoteScoreToDancePoints( TapNoteScore tns, bool bBeginn
 	int iWeight = 0;
 	switch( tns )
 	{
+#ifdef NO_PAY_MODE
+    default: return -999; //Assume it's not scored
+#else
 	DEFAULT_FAIL( tns );
+#endif
     case TNS_HitBonus:
 	case TNS_None:		iWeight = 0;														break;
 	case TNS_HitMine:	iWeight = g_iPercentScoreWeight.GetValue(SE_HitMine);				break;
