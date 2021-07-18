@@ -200,21 +200,21 @@ Grade PlayerStageStats::GetGrade() const
     {
         if (ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, false ) == -999)
             continue;
-        LOG->Trace("%s: %i * %i",TapNoteScoreToString(tns).c_str(),m_iTapNoteScores[tns],maxPossibleWeight);
+        //LOG->Trace("%s: %i * %i",TapNoteScoreToString(tns).c_str(),m_iTapNoteScores[tns],maxPossibleWeight);
         fPossible += m_iTapNoteScores[tns] * maxPossibleWeight;
     }
-    LOG->Trace("-------------------");
+    //LOG->Trace("-------------------");
     FOREACH_ENUM( TapNoteScore, tns )
     {
         int iTapScoreValue = ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, bIsBeginner );
         if (ScoreKeeperNormal::TapNoteScoreToGradePoints( tns, false ) == -999)
             continue;
         fActual += m_iTapNoteScores[tns] * iTapScoreValue;
-        LOG->Trace( "%s: %i * %i",TapNoteScoreToString(tns).c_str(), m_iTapNoteScores[tns], iTapScoreValue );
+        //LOG->Trace( "%s: %i * %i",TapNoteScoreToString(tns).c_str(), m_iTapNoteScores[tns], iTapScoreValue );
     }
 
     //No calculation of hold notes because they're weighted by 0
-    LOG->Trace("GetGrade: %f/%f",fActual,fPossible);
+    //LOG->Trace("GetGrade: %f/%f",fActual,fPossible);
     float fPercent = fActual/fPossible;
 #else
     FOREACH_ENUM( TapNoteScore, tns )
