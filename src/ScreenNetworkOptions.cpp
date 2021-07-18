@@ -146,6 +146,8 @@ bool ScreenNetworkOptions::MenuStart( const InputEventPlus &input )
 		return true;
 	*/
 	default:
+	    //Force reload NextScreen metric in case we want to go somewhere based on network connection
+	    this->SetNextScreenName(THEME->GetMetric (m_sName,"NextScreen"));
 		return ScreenOptions::MenuStart( input );
 	}
 }

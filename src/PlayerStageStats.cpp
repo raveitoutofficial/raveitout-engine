@@ -318,6 +318,7 @@ float PlayerStageStats::GetPercentDancePoints() const
     int fPossible = 0;
 
     int maxPossibleWeight=ScoreKeeperNormal::TapNoteScoreToDancePoints( TNS_W1, bIsBeginner );
+    //TODO: This is not correct, it should skip TNS_AvoidMine and HitBonus -RL
     FOREACH_ENUM( TapNoteScore, tns )
     {
         if (ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, false ) == -999)
@@ -326,9 +327,9 @@ float PlayerStageStats::GetPercentDancePoints() const
     }
     FOREACH_ENUM( TapNoteScore, tns )
     {
-        int iTapScoreValue = ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, bIsBeginner );
         if (ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, false ) == -999)
             continue;
+        int iTapScoreValue = ScoreKeeperNormal::TapNoteScoreToDancePoints( tns, bIsBeginner );
         fActual += m_iTapNoteScores[tns] * iTapScoreValue;
     }
     return MakePercentScore(fActual,fPossible);
