@@ -468,8 +468,9 @@ else() # Unix/Linux
       "arch/InputHandler/InputHandler_Linux_Event.cpp"
       "arch/InputHandler/InputHandler_Linux_PIUIO.cpp"
       "arch/InputHandler/InputHandler_SextetStream.cpp"
-            #Yeah I know it's not really input but I'm not gonna make yet another cmake thing for it ok
-            "arch/CardReader/CardReader_Arduino.cpp"
+      #"arch/InputHandler/InputHandler_MK3.cpp"
+      #Yeah I know it's not really input but I'm not gonna make yet another cmake thing for it ok
+      "arch/CardReader/CardReader_Arduino.cpp"
     )
     list(APPEND SMDATA_ARCH_INPUT_SRC
       "arch/InputHandler/LinuxInputManager.h"
@@ -477,7 +478,8 @@ else() # Unix/Linux
       "arch/InputHandler/InputHandler_Linux_Event.h"
       "arch/InputHandler/InputHandler_Linux_PIUIO.h"
       "arch/InputHandler/InputHandler_SextetStream.h"
-            "arch/CardReader/CardReader_Arduino.h"
+      #"arch/InputHandler/InputHandler_MK3.h"
+      "arch/CardReader/CardReader_Arduino.h"
     )
     if(WITH_TTY)
       list(APPEND SMDATA_ARCH_INPUT_SRC

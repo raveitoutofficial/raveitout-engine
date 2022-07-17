@@ -1,5 +1,5 @@
 #include <Adafruit_NeoPixel.h>
-#include <PacketSerial.h>
+//#include <PacketSerial.h>
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
@@ -24,7 +24,7 @@
 #define NUM_SPIRES 2
 Adafruit_NeoPixel spires[NUM_SPIRES] = {Adafruit_NeoPixel(NUMPIXELS, 6, NEO_GRB + NEO_KHZ800), Adafruit_NeoPixel(NUMPIXELS, 7, NEO_GRB + NEO_KHZ800)};
 //Adafruit_NeoPixel spire_P2(NUMPIXELS, 8, NEO_GRB + NEO_KHZ800);
-PacketSerial pkSerial;
+//PacketSerial pkSerial;
 byte buffer[6]; //max size of 6
 char bufferStr[6];
 
@@ -145,7 +145,7 @@ void setLEDsRainbow(Adafruit_NeoPixel *spire, int percent)
 
 void handlePacket(const void* sender, const uint8_t* buffer, size_t size)
 {
-  pkSerial.send(buffer,size);
+  //pkSerial.send(buffer,size);
   //Serial.print("AAAAAAAAAAAAAAAAAAAAAAAA");
   if (buffer[0]==MODE_REGULAR)
   {

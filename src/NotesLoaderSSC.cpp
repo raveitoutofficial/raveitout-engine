@@ -822,8 +822,8 @@ void SSCLoader::ProcessNoteskins( vector<RString> &out, const RString sParam )
 
     // If odd and greater than 1
     // Maybe it's not needed? I say it should either be one forced noteskin (For singleplayer)
-    // or however many is needed for multiplayer routine so each player loads
-    // the same number of noteskins.
+    // or however many is needed for multiplayer routine so each player loads the same number of noteskins.
+
     // Ex. Regular routine chart, #NOTESKINS:rio-perfor-p1,rio-perfor-p2,rio-perfor-p3,perfor-p4
     // Then Player 1 gets perfor1 and perfor2 and player 2 gets perfor3 and perfor4 and that's how you'd do CO-OP 4X
     // There won't be any limit on how many noteskins you can have loaded as long as it's even (PIU stops at 6 players)

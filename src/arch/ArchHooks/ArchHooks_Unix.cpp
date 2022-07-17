@@ -23,6 +23,7 @@
 #include "archutils/Unix/CrashHandler.h"
 #if defined(LINUX)
 #include <limits.h>
+#include <sys/io.h>
 #endif
 #endif
 
@@ -418,6 +419,32 @@ void ArchHooks::MountUserFilesystems( const RString &sDirOfExecutable )
 	FILEMAN->Mount( "dir", sUserDataPath + "/Songs", "/Songs" );
 	FILEMAN->Mount( "dir", sUserDataPath + "/RandomMovies", "/RandomMovies" );
 	FILEMAN->Mount( "dir", sUserDataPath + "/Themes", "/Themes" );
+}
+
+bool ArchHooks_Unix::OpenMemoryRange( unsigned short start_port, unsigned short bytes )
+{
+	LOG->Trace( "ArchHooks_Unix::OpenMemoryRange( %#x, %d )", start_port, bytes );
+
+	int ret = iopl(3);
+
+	if( ret != 0 )
+		LOG->Warn( "OpenMemoryRange(): iopl error: %s", strerror(errno) );
+
+	return (ret == 0);
+}
+
+void ArchHooks_Unix::CloseMemoryRange( unsigned short start_port, unsigned short bytes )
+{
+	if( (start_port+bytes) <= 0x3FF )
+	{
+		if( ioperm( start_port, bytes, 0 ) != 0 )
+			LOG->Warn( "CloseMemoryRange(): ioperm error: %s", strerror(errno) );
+
+		return;
+	}
+
+	if( iopl(0) != 0 )
+		LOG->Warn( "CloseMemoryRange(): iopl error: %s", strerror(errno) );
 }
 
 /*unsigned long ArchHooks::GetSystemAvailRam()

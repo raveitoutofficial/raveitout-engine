@@ -20,6 +20,9 @@ public:
 	static clockid_t GetClock();
 
 	RString GetClipboard();
+	
+	bool OpenMemoryRange( unsigned short start_port, unsigned short bytes );
+	void CloseMemoryRange( unsigned short start_port, unsigned short bytes );
 };
 
 #ifdef ARCH_HOOKS
