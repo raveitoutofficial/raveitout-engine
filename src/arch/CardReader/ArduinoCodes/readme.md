@@ -1,6 +1,6 @@
 # InuReader
 
-Created by Alex123123, adapted by Rhythm Lunatic for SM
+Created by Alex123123, adapted by Accelerator for SM
 
 This code essentially supports any Arduino since it's just sending the card data through serial.
 

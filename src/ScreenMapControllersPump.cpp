@@ -799,7 +799,7 @@ void ScreenMapControllersPump::ActionRow::Load(RString const& scr_name,
 
 
 
-/*  (c) 2021 Rhythm Lunatic.
+/*  (c) 2021 Accelerator.
 
     This file is part of StepAMWorks.
 

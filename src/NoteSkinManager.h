@@ -72,7 +72,7 @@ public:
 
 // IT'S A NOTESKIN AND UNLIKE NSMAN IT DOESN'T CHANGE ITS STATE
 // YOU CREATE THE NOTESKIN OBJECT. IT HOLDS A NOTESKIN. THE NOTESKIN DOESN'T CHANGE. THAT'S ALL YOU NEED!!!!!!!!!!!!!!!
-// -Rhythm Lunatic
+// -Accelerator
 class NoteSkin
 {
 public:

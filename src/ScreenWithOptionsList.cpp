@@ -104,7 +104,7 @@ public:
 LUA_REGISTER_DERIVED_CLASS( ScreenWithOptionsList, ScreenWithMenuElements )
 
 /*
- * (c) 2020 Rhythm Lunatic
+ * (c) 2020 Accelerator
  * This is free and unencumbered software released into the public domain.
  *
  * Anyone is free to copy, modify, publish, use, compile, sell, or

@@ -8,8 +8,13 @@
 #include "RageThreads.h"
 #include <sstream>
 #define HTTP_CHUNK_SIZE 1024 //matches EZSockets
-#define SSTR( x ) static_cast< std::ostringstream & >( \
+
+//Nobody has documented what this does or why it needs an o string stream or why it's performing
+//a static_cast. It doesn't compile. -RL
+//#define SSTR( x ) static_cast< std::ostringstream & >( \
         ( std::ostringstream() << std::dec << x ) ).str()
+
+#define SSTR( x ) RString(( std::ostringstream() << std::dec << x ).str())
 
 class HTTPHelper
 {

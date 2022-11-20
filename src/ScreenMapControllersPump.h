@@ -142,7 +142,7 @@ private:
 #endif //STEPMANIA_SCREENMAPCONTROLLERSPUMP_H
 
 /*
- *  (c) 2020 Rhythm Lunatic
+ *  (c) 2020 Accelerator
     This file is part of StepAMWorks.
 
     StepAMWorks is free software: you can redistribute it and/or modify

@@ -129,7 +129,7 @@ public:
 LUA_REGISTER_DERIVED_CLASS( ScreenLowLevelInput, ScreenWithMenuElements )
 
 /*
- *  (c) 2018-2021 Rhythm Lunatic
+ *  (c) 2018-2021 Accelerator
  *
  *  This file is part of StepAMWorks.
  *  StepAMWorks file is free software: you can redistribute it and/or modify

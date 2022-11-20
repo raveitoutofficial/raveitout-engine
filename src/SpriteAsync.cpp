@@ -1,7 +1,7 @@
 //
-// "I don't understand polymorphism or C++" - Rhythm Lunatic
-// "Who needs thread safety" - Rhythm Lunatic
-// "Why does the game keep crashing on the music wheel" - Rhythm Lunatic
+// "I don't understand polymorphism or C++" - Accelerator
+// "Who needs thread safety" - Accelerator
+// "Why does the game keep crashing on the music wheel" - Accelerator
 //
 #include "global.h"
 #include <cassert>
@@ -1489,7 +1489,7 @@ LUA_REGISTER_DERIVED_CLASS( SpriteAsync, Sprite )
 // lua end
 
 /*
- *  (c) 2018-2020 Rhythm Lunatic
+ *  (c) 2018-2020 Accelerator
  *
     This file is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

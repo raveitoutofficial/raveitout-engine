@@ -772,6 +772,9 @@ const RString& ProfileManager::GetProfileDir( ProfileSlot slot ) const
 	{
 	case ProfileSlot_Player1:
 	case ProfileSlot_Player2:
+    case ProfileSlot_Player3:
+    case ProfileSlot_Player4:
+
 		return m_sProfileDir[slot];
 	case ProfileSlot_Machine:
 		return MACHINE_PROFILE_DIR;
@@ -800,6 +803,8 @@ const Profile* ProfileManager::GetProfile( ProfileSlot slot ) const
 	{
 	case ProfileSlot_Player1:
 	case ProfileSlot_Player2:
+    case ProfileSlot_Player3:
+    case ProfileSlot_Player4:
 		return GetProfile( (PlayerNumber)slot );
 	case ProfileSlot_Machine:
 		return m_pMachineProfile;

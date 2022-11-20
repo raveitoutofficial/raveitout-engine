@@ -1,5 +1,5 @@
 /*
- * Created by Rhythm Lunatic on 9/29/19.
+ * Created by Accelerator on 9/29/19.
  * My arduino is connected to one of those RC522 thingies and flashed with a firmware
  * that writes the card ID in bytes to the serial port.
  * The first two bytes are just 'aaaa' so they're ignored. Rest is the card ID.

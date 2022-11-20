@@ -36,7 +36,7 @@ private:
 #endif
 
 /*
-* (c) 2020 Rhythm Lunatic
+* (c) 2020 Accelerator
 * All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a

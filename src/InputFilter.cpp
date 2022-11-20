@@ -195,7 +195,8 @@ void InputFilter::ButtonPressed( const DeviceInput &di )
 	}
 	if(di.button >= NUM_DeviceButton)
 	{
-		LOG->Trace("InputFilter::ButtonPressed: Invalid button %i", di.button);
+        //This is annoying and linux treats ANY button on the computer as a button so you get a bunch of log spam
+		//LOG->Trace("InputFilter::ButtonPressed: Invalid button %i", di.button);
 		return;
 	}
 

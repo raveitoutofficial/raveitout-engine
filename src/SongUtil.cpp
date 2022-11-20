@@ -582,7 +582,7 @@ RString SongUtil::GetSectionNameFromSongAndSort( const Song* pSong, SortOrder so
     case SORT_DOUBLE_ALL_DIFFICULTY_METER:
         //There's no point in jumping to an open level folder since we'd probably want to go to a certain level
         //Also I was getting crashes because it was trying to open an invalid folder...
-        return "";
+        return RString();
         //return RString();
 	case SORT_GROUP:
 		// guaranteed not empty	
@@ -646,6 +646,7 @@ RString SongUtil::GetSectionNameFromSongAndSort( const Song* pSong, SortOrder so
 		}
 	case SORT_POPULARITY:
 	case SORT_RECENT:
+    case SORT_ALL_SONGS:
 		return RString();
 	case SORT_TOP_GRADES:
 		{

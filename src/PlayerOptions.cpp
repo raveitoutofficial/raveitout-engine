@@ -2578,7 +2578,7 @@ public:
 LUA_REGISTER_CLASS( PlayerOptions )
 // lua end
 
-/*  (c) 2021 Rhythm Lunatic.
+/*  (c) 2021 Accelerator.
 
     This file is part of StepAMWorks.
 

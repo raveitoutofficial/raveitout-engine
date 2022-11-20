@@ -1,6 +1,4 @@
-//
-// Created by gaming on 6/16/21.
-//
+
 
 #include "global.h"
 #include "LightsDriver_WS2812B.h"
@@ -132,7 +130,7 @@ void LightsDriver_WS2812B::Set( const LightsState *ls)
     }
 }
 
-/*  (c) 2021 Rhythm Lunatic.
+/*  (c) 2021 Accelerator.
 
     This file is part of StepAMWorks.
 

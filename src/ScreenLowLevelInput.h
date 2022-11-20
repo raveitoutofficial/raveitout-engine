@@ -22,7 +22,7 @@ private:
 #endif //STEPMANIA_SCREENLOWLEVELINPUT_H
 
 /*
- *  (c) 2018-2020 Rhythm Lunatic
+ *  (c) 2018-2020 Accelerator
  *
  *  This file is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

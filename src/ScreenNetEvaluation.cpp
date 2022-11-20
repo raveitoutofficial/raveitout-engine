@@ -301,7 +301,7 @@ LUA_REGISTER_DERIVED_CLASS( ScreenNetEvaluation, ScreenEvaluation )
 
 #endif
 
-/*  (c) 2021 Rhythm Lunatic.
+/*  (c) 2021 Accelerator.
 
     This file is part of StepAMWorks.
 

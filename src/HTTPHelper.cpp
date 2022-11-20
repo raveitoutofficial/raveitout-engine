@@ -109,6 +109,9 @@ RString HTTPHelper::SubmitPostRequest(const RString &URL, const RString &PostDat
 				Header+= "Host: " + Server + "\r\n";
 				Header+= "User-Agent: OpenITG/1.0.0\r\n";
 				Header+= "Accept: */*\r\n";
+                //std::ostringstream tmp;
+                //tmp << std::dec << strlen(PostData.c_str());
+                //Header+= "Content-Length: " + tmp.str() + "\r\n";
 				Header+= "Content-Length: " + SSTR( strlen(PostData.c_str() ) ) + "\r\n";
 				Header+= "Content-Type: application/x-www-form-urlencoded\r\n\r\n";
 				Header+= PostData;

@@ -1108,7 +1108,7 @@ LuaFunction( ReportStyle,			ReportStyle() )
 LuaFunction( GetServerName,			NSMAN->GetServerName() )
 LuaFunction( CloseConnection,		CloseNetworkConnection() )
 
-/*  (c) 2021 Rhythm Lunatic.
+/*  (c) 2021 Accelerator.
 
     This file is part of StepAMWorks.
 

@@ -43,6 +43,7 @@ AutoScreenMessage( SM_SongChanged ); // TODO: Replace this with a Message and ME
 AutoScreenMessage( SM_SortOrderChanging );
 AutoScreenMessage( SM_SortOrderChanged );
 
+//Forces an appropriate sort for course modes. Has no effect on other modes.
 static SortOrder ForceAppropriateSort( PlayMode pm, SortOrder so )
 {
 	switch( pm )
@@ -703,6 +704,7 @@ void MusicWheel::BuildWheelItemDatas( vector<MusicWheelItemData *> &arrayWheelIt
 		case SORT_ROULETTE:
 		case SORT_GROUP:
 		case SORT_TITLE:
+        case SORT_ALL_SONGS:
 		case SORT_BPM:
 		case SORT_POPULARITY:
 		case SORT_TOP_GRADES:
