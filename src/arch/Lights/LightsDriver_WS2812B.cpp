@@ -42,7 +42,7 @@ void LightsDriver_WS2812B::Set( const LightsState *ls)
 {
     /*
      * we don't need the lights state at all because we don't use it like SM lights,
-     * but since Set() is called every time the main thread calls update() it's good
+     * but since Set() is called every time the main thread calls update() it's a good
      * way to update the LEDs.
      */
     if (!arduino.isOpen())

@@ -10,12 +10,13 @@
 #define HTTP_CHUNK_SIZE 1024 //matches EZSockets
 
 //Nobody has documented what this does or why it needs an o string stream or why it's performing
-//a static_cast. It doesn't compile. -RL
-//#define SSTR( x ) static_cast< std::ostringstream & >( \
+//a static_cast. It also somehow only compiles on Windows, and the replacement function only compiles on Linux.
+#if defined(WINDOWS) || defined(WIN32) || defined(_WIN32) || defined(_WINDOWS)
+#define SSTR( x ) static_cast< std::ostringstream & >( \
         ( std::ostringstream() << std::dec << x ) ).str()
-
+#else
 #define SSTR( x ) RString(( std::ostringstream() << std::dec << x ).str())
-
+#endif
 class HTTPHelper
 {
 public:
