@@ -35,6 +35,7 @@ void ScreenWithMenuElements::Init()
 	CANCEL_TRANSITIONS_OUT.Load( m_sName, "CancelTransitionsOut" );
 	TIMER_SECONDS.Load( m_sName, "TimerSeconds" );
 	TIMER_METRICS_GROUP.Load( m_sName, "TimerMetricsGroup" );
+    EXPIRED_TIMER_GOES_BACK.Load(m_sName,"ExpiredTimerGoesBack");
 	Screen::Init();
 
 	ASSERT( this->m_SubActors.empty() );	// don't call Init twice!
@@ -154,7 +155,10 @@ void ScreenWithMenuElements::HandleScreenMessage( const ScreenMessage SM )
 		{
 			InputEventPlus iep;
 			iep.pn = p;
-			MenuStart( iep );
+            if (EXPIRED_TIMER_GOES_BACK)
+                MenuBack( iep );
+            else
+    			MenuStart( iep );
 		}
 	}
 

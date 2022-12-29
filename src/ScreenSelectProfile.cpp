@@ -219,11 +219,18 @@ void ScreenSelectProfile::HandleScreenMessage( const ScreenMessage SM )
 {
 	if( SM == SM_MenuTimer )
 	{
-		bool bFinished = Finish();
-		if( !bFinished )
-		{
-			// TODO: we need to decide how to handle unfinished business.
-		}
+        if (EXPIRED_TIMER_GOES_BACK)
+        {
+            StartTransitioningScreen( SM_GoToPrevScreen );
+        }
+        else
+        {
+            bool bFinished = Finish();
+            if( !bFinished )
+            {
+                // TODO: we need to decide how to handle unfinished business.
+            }
+        }
 	}
 
 	ScreenWithMenuElements::HandleScreenMessage( SM );

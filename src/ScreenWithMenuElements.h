@@ -59,6 +59,7 @@ protected:
 	ThemeMetric<float>		TIMER_SECONDS;
 	ThemeMetric<RString>	TIMER_METRICS_GROUP;
 	ThemeMetric<bool>		RESET_GAMESTATE;
+    ThemeMetric<bool>       EXPIRED_TIMER_GOES_BACK;
 
 private:
 	RString m_sPathToMusic;
