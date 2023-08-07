@@ -139,6 +139,7 @@ namespace SongUtil
 	void SortSongPointerArrayByArtist( vector<Song*> &vpSongsInOut );
 	void SortSongPointerArrayByDisplayArtist( vector<Song*> &vpSongsInOut );
 	void SortSongPointerArrayByGenre( vector<Song*> &vpSongsInOut );
+    void SortSongPointerArrayByCategory( vector <Song*> &vpSongsInOut );
 	void SortSongPointerArrayByOrigin(vector<Song*> &vpSongsInOut );
 	void SortSongPointerArrayByGroupAndTitle( vector<Song*> &vpSongsInOut );
 	void SortSongPointerArrayByNumPlays( vector<Song*> &vpSongsInOut, ProfileSlot slot, bool bDescending );

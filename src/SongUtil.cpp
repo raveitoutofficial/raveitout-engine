@@ -518,6 +518,76 @@ void SongUtil::SortSongPointerArrayByGenre( vector<Song*> &vpSongsInOut )
 	stable_sort( vpSongsInOut.begin(), vpSongsInOut.end(), CompareSongPointersByGenre );
 }
 
+/*int SongUtil::CompareSongPointersByCategory(const Song *pSong1, const Song *pSong2)
+{
+    return pSong1->m_SongCategory < pSong2->m_SongCategory;
+}*/
+
+static int CompareSongPointersByCategoryAndTitle( const Song *pSong1, const Song *pSong2 )
+{
+
+
+    //Check Category
+    char sCategory1 = pSong1->m_SongCategory;
+    char sCategory2 = pSong2->m_SongCategory;
+
+    //RIO sorts shortcut and marathon into their own folder, but ONLY those two.
+    //PIU uses remix, but we don't use remix anyways.
+    if (pSong1->m_SongLengthOverride == Song::length_shortcut)
+        sCategory1 = -1;
+    else if (pSong1->m_SongLengthOverride > Song::length_normal || pSong1->IsLong() || pSong1->IsMarathon())
+        sCategory1 = -3; //In case we ever add Remix as 2.
+
+    if (pSong2->m_SongLengthOverride == Song::length_shortcut)
+        sCategory2 = -1;
+    else if (pSong2->m_SongLengthOverride > Song::length_normal || pSong1->IsLong() || pSong1->IsMarathon())
+        sCategory2 = -3; //In case we ever add Remix as 2.
+
+
+
+    if( sCategory1 < sCategory2 )
+        return true;
+    if( sCategory1 > sCategory2 )
+        return false;
+
+    /* Same group; compare by name. */
+    return CompareSongPointersByTitle( pSong1, pSong2 );
+}
+
+void SongUtil::SortSongPointerArrayByCategory(vector<Song*> &vpSongsInOut )
+{
+    sort( vpSongsInOut.begin(), vpSongsInOut.end(), CompareSongPointersByCategoryAndTitle );
+    /*if(true)
+    {
+        // move all unlock songs to a group at the bottom
+        PreferredSortSection PFSection;
+        PFSection.sName = "Unlocks";
+        FOREACH( UnlockEntry, UNLOCKMAN->m_UnlockEntries, ue )
+        {
+            if( ue->m_Type == UnlockRewardType_Song )
+            {
+                Song *pSong = ue->m_Song.ToSong();
+                if( pSong )
+                    PFSection.vpSongs.push_back( pSong );
+            }
+        }
+
+        FOREACH( PreferredSortSection, m_vPreferredSongSort, v )
+        {
+            for( int i=v->vpSongs.size()-1; i>=0; i-- )
+            {
+                Song *pSong = v->vpSongs[i];
+                if( find(PFSection.vpSongs.begin(),PFSection.vpSongs.end(),pSong) != PFSection.vpSongs.end() )
+                {
+                    v->vpSongs.erase( v->vpSongs.begin()+i );
+                }
+            }
+        }
+
+        m_vPreferredSongSort.push_back( PFSection );
+    }*/
+}
+
 static int CompareSongPointersByOrigin(const Song *pSong1, const Song *pSong2)
 {
     return pSong1->m_sOrigin < pSong2->m_sOrigin;
@@ -613,6 +683,31 @@ RString SongUtil::GetSectionNameFromSongAndSort( const Song* pSong, SortOrder so
 		if( !pSong->m_sGenre.empty() )
 			return pSong->m_sGenre;
 		return SORT_NOT_AVAILABLE.GetValue();
+    case SORT_CATEGORY:
+    {
+        //Rave Tracks don't go in full songs.
+        //if (pSong->m_SongCategory == Song::RAVE)
+        //    return "Rave Tracks";
+        if (pSong->m_SongLengthOverride > Song::length_normal || pSong->IsLong() || pSong->IsMarathon())
+            return "Full Tracks";
+        else if (pSong->m_SongLengthOverride==Song::length_shortcut)
+            return "Snap Tracks";
+        switch (pSong->m_SongCategory)
+        {
+            case Song::ORIGINAL: return "Original Tunes";
+            case Song::K_POP: return "K-Pop";
+            case Song::J_MUSIC: return "J-Music";
+            case Song::XROSS: return "XROSS";
+            case Song::COUNTRY: return "Country";
+            case Song::EDM: return "EDM";
+            case Song::HIP_HOP: return "Hip-Hop";
+            case Song::LATIN: return "Latin Pop";
+            case Song::POP: return "Pop";
+            case Song::ROCK: return "Rock";
+            case Song::RAVE: return "Rave Tracks";
+        }
+        return SORT_NOT_AVAILABLE.GetValue();
+    }
     case SORT_ORIGIN:
         if( !pSong->m_sOrigin.empty() )
             return pSong->m_sOrigin;

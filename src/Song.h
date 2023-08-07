@@ -234,6 +234,24 @@ public:
 	/** @brief The genre of the song/file. */
 	RString m_sGenre;
 
+    /** @brief the genre folder this belongs in. */
+    enum SongCategory : unsigned char {
+        ORIGINAL = 0,
+        //WORLD_MUSIC, //RIO doesn't need this, so dump it in original?
+        K_POP,
+        J_MUSIC,
+        XROSS,
+
+        //RIO genres
+        COUNTRY,
+        EDM,
+        HIP_HOP,
+        LATIN,
+        POP,
+        ROCK,
+        RAVE
+    } m_SongCategory = ORIGINAL;
+
 	/**
 	 * @brief The person who worked with the song file who should be credited.
 	 * This is read and saved, but never actually used. */
@@ -420,6 +438,7 @@ public:
 	float GetStepsSeconds() const;
 	bool IsLong() const;
 	bool IsMarathon() const;
+    //char GetPIUStageCost() const;
 
 	bool SongCompleteForStyle( const Style *st ) const;
 	bool HasStepsType( StepsType st ) const;

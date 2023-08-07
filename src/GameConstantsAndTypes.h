@@ -173,6 +173,7 @@ enum SortOrder
 	SORT_TOP_GRADES, /**< Sort by the highest grades earned on a Song. */
 	SORT_ARTIST, /**< Sort by the name of the artist of the Song. */
 	SORT_GENRE, /**< Sort by the Song's genre. */
+	SORT_CATEGORY, //You can guess what it means
 	SORT_ORIGIN, /**< Sort by the origin tag. (Only Rave It Out uses this) */
 	SORT_BEGINNER_METER, /**< Sort by the difficulty of the single beginner meter. */
 	SORT_EASY_METER, /**< Sort by the difficulty of the single easy meter. */
@@ -185,7 +186,7 @@ enum SortOrder
 	SORT_DOUBLE_HARD_METER, /**< Sort by the difficulty of the double hard meter. */
 	SORT_DOUBLE_CHALLENGE_METER, /**< Sort by the difficulty of the double challenge meter. */
 	SORT_DOUBLE_ALL_DIFFICULTY_METER, /** Sort by meter, regardless of difficulties. */
-	SORT_TAGS, //Preferred Sort on crack
+	//SORT_TAGS, //Preferred Sort on crack
 	//
 	SORT_MODE_MENU, /**< Have access to the menu for choosing the sort. */
 	// course sorts

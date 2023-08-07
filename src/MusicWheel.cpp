@@ -700,7 +700,6 @@ void MusicWheel::BuildWheelItemDatas( vector<MusicWheelItemData *> &arrayWheelIt
 			AddCustomWheelItems(arrayWheelItemDatas);
 			break;
 		}
-
 		case SORT_ROULETTE:
 		case SORT_GROUP:
 		case SORT_TITLE:
@@ -710,6 +709,7 @@ void MusicWheel::BuildWheelItemDatas( vector<MusicWheelItemData *> &arrayWheelIt
 		case SORT_TOP_GRADES:
 		case SORT_ARTIST:
 		case SORT_GENRE:
+        case SORT_CATEGORY:
 		case SORT_ORIGIN:
 		case SORT_BEGINNER_METER:
 		case SORT_EASY_METER:
@@ -774,6 +774,8 @@ void MusicWheel::BuildWheelItemDatas( vector<MusicWheelItemData *> &arrayWheelIt
 				case SORT_GENRE:
 					SongUtil::SortSongPointerArrayByGenre( arraySongs );
 					break;
+                case SORT_CATEGORY:
+                    SongUtil::SortSongPointerArrayByCategory( arraySongs );
 			    case SORT_ORIGIN:
 			        SongUtil::SortSongPointerArrayByOrigin( arraySongs );
 			        break;
