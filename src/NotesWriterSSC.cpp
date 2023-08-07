@@ -266,7 +266,24 @@ static void WriteGlobalTags( RageFile &f, const Song &out )
 		case Song::length_remix: f.PutLine("#SONGTYPE:REMIX;"); break;
 		case Song::length_long: f.PutLine("#SONGTYPE:FULLSONG;"); break;
 		case Song::length_marathon: f.PutLine("#SONGTYPE:MUSICTRAIN;"); break;
+        case Song::length_unset: break;
 	}
+
+    f.Write("#SONGCATEGORY:");
+    switch (out.m_SongCategory)
+    {
+        case Song::ORIGINAL: f.PutLine("ORIGINAL;"); break;
+        case Song::K_POP: f.PutLine("K-POP;"); break;
+        case Song::J_MUSIC: f.PutLine("J-MUSIC;"); break;
+        case Song::XROSS: f.PutLine("XROSS;"); break;
+        case Song::COUNTRY: f.PutLine("COUNTRY;"); break;
+        case Song::EDM: f.PutLine("EDM;"); break;
+        case Song::HIP_HOP: f.PutLine("HIP-HOP;"); break;
+        case Song::LATIN: f.PutLine("LATIN;"); break;
+        case Song::POP: f.PutLine("POP;"); break;
+        case Song::ROCK: f.PutLine("ROCK;"); break;
+        case Song::RAVE: f.PutLine("RAVE;"); break;
+    }
 
 	switch( out.m_DisplayBPMType )
 	{

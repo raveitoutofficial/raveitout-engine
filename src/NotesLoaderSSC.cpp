@@ -103,6 +103,56 @@ void SetGenre(SongTagInfo& info)
 {
 	info.song->m_sGenre = (*info.params)[1];
 }
+void SetCategory(SongTagInfo& info)
+{
+    RString param = (*info.params)[1];
+    if (param=="USE_GENRE")
+        param = info.song->m_sGenre;
+    //This does it in place, no need to return the value
+    param.MakeUpper();
+
+    if(param=="K-POP")
+    {
+        info.song->m_SongCategory = info.song->K_POP;
+    }
+    else if(param=="J-MUSIC")
+    {
+        info.song->m_SongCategory = info.song->J_MUSIC;
+    }
+    else if(param=="XROSS")
+    {
+        info.song->m_SongCategory = info.song->XROSS;
+    }
+    else if(param=="COUNTRY")
+    {
+        info.song->m_SongCategory = info.song->COUNTRY;
+    }
+    else if(param=="EDM")
+    {
+        info.song->m_SongCategory = info.song->EDM;
+    }
+    else if(param=="HIP HOP" || param=="HIP-HOP")
+    {
+        info.song->m_SongCategory = info.song->HIP_HOP;
+    }
+    else if(param=="LATIN")
+    {
+        info.song->m_SongCategory = info.song->LATIN;
+    }
+    else if(param=="POP")
+    {
+        info.song->m_SongCategory = info.song->POP;
+    }
+    else if(param=="ROCK")
+    {
+        info.song->m_SongCategory = info.song->ROCK;
+    }
+    else if(param=="RAVE")
+    {
+        info.song->m_SongCategory = info.song->RAVE;
+    }
+    //Wondering why there's no else statement here? It defaults to ORIGINAL.
+}
 void SetOrigin(SongTagInfo& info)
 {
 	info.song->m_sOrigin = (*info.params)[1];
@@ -577,6 +627,7 @@ struct ssc_parser_helper_t
 		song_tag_handlers["SUBTITLETRANSLIT"]= &SetSubtitleTranslit;
 		song_tag_handlers["ARTISTTRANSLIT"]= &SetArtistTranslit;
 		song_tag_handlers["GENRE"]= &SetGenre;
+        song_tag_handlers["SONGCATEGORY"] = &SetCategory;
 		song_tag_handlers["ORIGIN"]= &SetOrigin;
 		song_tag_handlers["CREDIT"]= &SetCredit;
 		song_tag_handlers["BANNER"]= &SetBanner;
