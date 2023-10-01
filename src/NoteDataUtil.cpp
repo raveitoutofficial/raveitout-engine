@@ -121,8 +121,7 @@ static void LoadFromSMNoteDataStringWithPlayer( NoteData& out, const RString &sS
 				   https://github.com/rhythmlunatic/stepmania/wiki/Note-Types#stepf2-notes
 				   */
 				bool hasStepF2Annotation = ch == '{';
-				char StepF2NoteAppearance, StepF2FakeBit;
-				signed char SF2UnknownBit;
+				char StepF2NoteAppearance, StepF2FakeBit, StepF2NoteskinBit;
 
 				if(hasStepF2Annotation)
 				{
@@ -134,40 +133,24 @@ static void LoadFromSMNoteDataStringWithPlayer( NoteData& out, const RString &sS
 						ch = *(p + 1);
 						StepF2NoteAppearance = *(p + 3); //Get char three past p (so 'b' in {a|b})
 						StepF2FakeBit = '0';
-						SF2UnknownBit = 0;
+                        StepF2NoteskinBit = 0;
 						p = annotationEnd;
 					}
 					else
 					{
 						const char* separator2 = p + 4;
 						const char* separator3 = p + 6;
-						//annotationEnd = p + 8;
+						annotationEnd = p + 8;
 
 						//Sanity checking
-						//Due to using the 4th bit as free data containing possible data from -127 to 127, we can't assume it ends at p+8
-						// && *annotationEnd == '}'
-						if(annotationEnd < endLine && *separator == '|' && *separator2 == '|' && *separator3 == '|')
-						{
-							ch = *(p + 1);
-							StepF2NoteAppearance = *(p + 3);
-							StepF2FakeBit = *(p + 5);
-
-							//Scan until we find the end tag
-							unsigned char endTagOffset = 7; //Start at 7 so we know the size of the 4th bit... This probably isn't a good idea
-							while (*(p+endTagOffset) != '}') //Normally it's at p+8 but the size of the SF2UnknownBit can be up to 4 characters long ("-127" to "127")
-							{
-								if (endTagOffset > 7+4) //If we've scanned past the max size of a string "{a|b|c|-ddd}" give up
-								{
-									isBadLine = true;
-									break;
-								}
-								endTagOffset+=1;
-							}
-							std::string unknownBitString = std::string(p+7,p+endTagOffset);
-							SF2UnknownBit = std::stoi(unknownBitString);
-
-							p = p+endTagOffset;
-						}
+                        if(annotationEnd < endLine && *separator == '|' && *separator2 == '|' && *separator3 == '|' && *annotationEnd == '}')
+                        {
+                            ch = *(p + 1);
+                            StepF2NoteAppearance = *(p + 3);
+                            StepF2FakeBit = *(p + 5);
+                            StepF2NoteskinBit = *(p + 7);
+                            p = annotationEnd;
+                        }
 						else
 						{
 							hasStepF2Annotation = false;
@@ -176,8 +159,6 @@ static void LoadFromSMNoteDataStringWithPlayer( NoteData& out, const RString &sS
 					}
 				}
 
-				/*if(hasStepF2Annotation && SF2UnknownBit != '0')
-					isBadLine = true;*/
 
 				switch( ch )
 				{
@@ -193,27 +174,27 @@ static void LoadFromSMNoteDataStringWithPlayer( NoteData& out, const RString &sS
                 //StepF2 notes.
                 case 'X':
                     tn = TAP_ORIGINAL_TAP;
-                    tn.noteskinNumber = 1;
+                    tn.iNoteskin = 1;
                     break;
                 case 'x':
                     tn = TAP_ORIGINAL_HOLD_HEAD;
-                    tn.noteskinNumber = 1;
+                    tn.iNoteskin = 1;
                     break;
                 case 'Y':
                     tn = TAP_ORIGINAL_TAP;
-                    tn.noteskinNumber = 2;
+                    tn.iNoteskin = 2;
                     break;
                 case 'y':
                     tn = TAP_ORIGINAL_HOLD_HEAD;
-                    tn.noteskinNumber = 2;
+                    tn.iNoteskin = 2;
                     break;
                 case 'Z':
                     tn = TAP_ORIGINAL_TAP;
-                    tn.noteskinNumber = 3;
+                    tn.iNoteskin = 3;
                     break;
                 case 'z':
                     tn = TAP_ORIGINAL_HOLD_HEAD;
-                    tn.noteskinNumber = 3;
+                    tn.iNoteskin = 3;
                     break;
 				case '2':
 				case '4':
@@ -281,42 +262,24 @@ static void LoadFromSMNoteDataStringWithPlayer( NoteData& out, const RString &sS
 
                 if(hasStepF2Annotation)
                 {
-                    switch(StepF2FakeBit)
-                    {
-                        case '0':
-                            break;
-                        case '1':
-                            tn.isFakeNote = true;
-                            break;
-                        default:
-                            isBadLine = true;
-                            break;
-                    }
-
                     switch(StepF2NoteAppearance)
                     {
-                        case '8':
-                            tn = TAP_ORIGINAL_FAKE;
-                            break;
-                        case 'h':
-                            //LOG->Warn( "TODO {1|h} - stealth attribute not implemented" );
-                            tn.appearance = TapNoteAppearance_Stealth;
-                            break;
                         case 'n':
-                            //tn = TAP_ORIGINAL_FAKE;
                             break;
-                        case 's':
-                            tn.appearance = TapNoteAppearance_Sudden;
-                            break;
-                        case 'v':
-                            tn.appearance = TapNoteAppearance_Hidden;
-                            break;
+                        case 'h': tn.appearance = TapNoteAppearance_Stealth; break;
+                        case 's': tn.appearance = TapNoteAppearance_Sudden; break;
+                        case 'v': tn.appearance = TapNoteAppearance_Hidden; break;
                         default:
                             isBadLine = true;
                             break;
                     }
-
-					tn.xOffset = SF2UnknownBit;
+                    switch( StepF2FakeBit )
+                    {
+                        case 0: tn.judge = TapNoteJudge_Normal; break;
+                        case 1: tn.judge = TapNoteJudge_Fake; break;
+                        default:
+                            break;
+                    }
                 }
 
 
@@ -569,15 +532,18 @@ void NoteDataUtil::GetSMNoteDataString( const NoteData &in, RString &sRet )
 					case TapNoteType_Attack:			c = 'A'; break;
 					case TapNoteType_AutoKeysound:	c = 'K'; break;
 					case TapNoteType_Lift:			c = 'L'; break;
-					case TapNoteType_Fake:			c = 'F'; break;
 					case TapNoteType_Bonus:			c = 'B'; break;
 					default: 
 						c = '\0';
 						FAIL_M(ssprintf("Invalid tap note type: %i", tn.type));
 					}
 
+                    //Really dumb code... Since 'F' no longer exists, check if it's a normal tap note with fake attribute
+                    if (tn.type==TapNoteType_Tap && tn.judge==TapNoteJudge_Fake && tn.appearance == TapNoteAppearance_Normal && tn.iNoteskin==0) {
+                        sRet.append(1, 'F');
+                    }
 					//Check for SF2 attributes
-					if (tn.isFakeNote || tn.appearance != TapNoteAppearance_Normal || tn.xOffset != 0)
+					else if (tn.judge==TapNoteJudge_Fake || tn.appearance != TapNoteAppearance_Normal || tn.iNoteskin != 0)
 					{
 						char c2;
 						switch (tn.appearance)
@@ -590,7 +556,7 @@ void NoteDataUtil::GetSMNoteDataString( const NoteData &in, RString &sRet )
 								FAIL_M(ssprintf("Invalid tap note appearance: %i", tn.appearance));
 
 						}
-						sRet.append( ssprintf("{%c|%c|%i|%i}",c,c2,tn.isFakeNote,tn.xOffset) );
+						sRet.append( ssprintf("{%c|%c|%i|%i}",c,c2,tn.judge,tn.iNoteskin) );
 					}
 					else
 						sRet.append( 1, c );
@@ -1092,7 +1058,11 @@ void NoteDataUtil::CalculateRadarValues( const NoteData &in, float fSongSeconds,
 				++num_chaos_rows;
 			}
 		}
-		if(state.judgable)
+        if (curr_note->judge == TapNoteJudge_Fake)
+        {
+            ++out[RadarCategory_Fakes];
+        }
+		else if(state.judgable)
 		{
 			switch(curr_note->type)
 			{
@@ -1148,9 +1118,6 @@ void NoteDataUtil::CalculateRadarValues( const NoteData &in, float fSongSeconds,
 					break;
 				case TapNoteType_Mine:
 					++out[RadarCategory_Mines];
-					break;
-				case TapNoteType_Fake:
-					++out[RadarCategory_Fakes];
 					break;
 				default:
 					break;
@@ -1316,12 +1283,13 @@ void NoteDataUtil::RemoveLifts(NoteData &inout, int iStartIndex, int iEndIndex)
 
 void NoteDataUtil::RemoveFakes(NoteData &inout, TimingData const& timing_data, int iStartIndex, int iEndIndex)
 {
-	RemoveSpecificTapNotes(inout, TapNoteType_Fake, iStartIndex, iEndIndex);
+	//RemoveSpecificTapNotes(inout, TapNoteType_Fake, iStartIndex, iEndIndex);
 	for(int t=0; t<inout.GetNumTracks(); t++)
 	{
 		FOREACH_NONEMPTY_ROW_IN_TRACK_RANGE(inout, t, r, iStartIndex, iEndIndex)
 		{
-			if(!timing_data.IsJudgableAtRow(r))
+            //Untested, no idea if it works - RL
+            if( inout.GetTapNote(t,r).judge == TapNoteJudge_Fake )
 			{
 				inout.SetTapNote( t, r, TAP_EMPTY );
 			}
@@ -1812,7 +1780,6 @@ static void SuperShuffleTaps( NoteData &inout, int iStartIndex, int iEndIndex )
 			case TapNoteType_Mine:
 			case TapNoteType_Attack:
 			case TapNoteType_Lift:
-			case TapNoteType_Fake:
 				break;	// shuffle this
 			DEFAULT_FAIL( tn1.type );
 			}
@@ -1844,7 +1811,6 @@ static void SuperShuffleTaps( NoteData &inout, int iStartIndex, int iEndIndex )
 				case TapNoteType_Mine:
 				case TapNoteType_Attack:
 				case TapNoteType_Lift:
-				case TapNoteType_Fake:
 					break;	// ok to swap with this
 				DEFAULT_FAIL( tn2.type );
 				}
@@ -1980,7 +1946,7 @@ void NoteDataUtil::Wide( NoteData &inout, int iStartIndex, int iEndIndex )
 			iTrackToAdd--;
 		CLAMP( iTrackToAdd, 0, inout.GetNumTracks()-1 );
 
-		if( inout.GetTapNote(iTrackToAdd, i).type != TapNoteType_Empty  &&  inout.GetTapNote(iTrackToAdd, i).type != TapNoteType_Fake )
+		if( inout.GetTapNote(iTrackToAdd, i).type != TapNoteType_Empty  &&  inout.GetTapNote(iTrackToAdd, i).judge != TapNoteJudge_Fake )
 		{
 			iTrackToAdd = (iTrackToAdd+1) % inout.GetNumTracks();
 		}

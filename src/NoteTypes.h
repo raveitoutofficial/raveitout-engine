@@ -94,7 +94,7 @@ enum TapNoteType
 	TapNoteType_Attack,		/**< Hitting this note causes an attack to take place. */
 	TapNoteType_AutoKeysound,	/**< A special sound is played when this note crosses the target area. */
     TapNoteType_Bonus,      /** This note is not scored, but it's added to TapNoteScore_HitBonus. Used only for missions and minigames. */
-	TapNoteType_Fake,		/**< This arrow can't be scored for or against the player. */
+	//TapNoteType_Fake,		/**< This arrow can't be scored for or against the player. */
 	NUM_TapNoteType,
 	TapNoteType_Invalid
 };
@@ -125,6 +125,14 @@ enum TapNoteAppearance
     TapNoteAppearance_Invalid
 };
 
+enum TapNoteJudge {
+    TapNoteJudge_Normal,
+    TapNoteJudge_Fake,
+    TapNoteJudge_Bonus,
+    NUM_TapNoteJudge,
+    TapNoteJudge_Invalid
+};
+
 /** @brief The different places a TapNote could come from. */
 enum TapNoteSource
 {
@@ -144,23 +152,19 @@ struct TapNote
 	TapNoteType		type;
 	/** @brief The sub type of the note. This is only used if the type is hold_head. */
 	TapNoteSubType		subType;
-	/** @brief the appearance of the note, for pump. If an attribute is set it can be hidden,sudden,or stealth. */
+	/** @brief The appearance of the note, for pump. If an attribute is set it can be hidden,sudden,or stealth. */
 	TapNoteAppearance appearance;
+    /** @brief How this TapNote should be judged. */
+    TapNoteJudge judge;
 	/** @brief The originating source of the TapNote. */
 	TapNoteSource		source;
 	/** @brief The result of hitting or missing the TapNote. */
 	TapNoteResult	result;
 	/** @brief The Player that is supposed to hit this note. This is mainly for Routine Mode. */
 	PlayerNumber	pn;
-	/** @brief If this note is judged. The Fake note is limited in ability so this is used for everyting other than tap notes.. Consider the fake note type to be depreciated. */
-	bool isFakeNote;
 
-	// Which noteskin to use if there are forced noteskins in this steps.
-	// automatically determined for holds.
-    unsigned char noteskinNumber;
-
-    //musWave meme
-    signed char xOffset;
+	//Multiple noteskins can be loaded for a single chart. This holds which noteskin to use.
+    unsigned char iNoteskin;
 
 	// used only if Type == attack:
 	RString		sAttackModifiers;
@@ -181,21 +185,20 @@ struct TapNote
 	void PushSelf( lua_State *L );
 
 	TapNote(): type(TapNoteType_Empty), subType(TapNoteSubType_Invalid),
-		source(TapNoteSource_Original),	result(), pn(PLAYER_INVALID),  sAttackModifiers(""), 
-		fAttackDurationSeconds(0), iKeysoundIndex(-1), iDuration(0), HoldResult(), noteskinNumber(0) {}
+               appearance(TapNoteAppearance_Normal), judge(TapNoteJudge_Normal),
+               source(TapNoteSource_Original), result(), pn(PLAYER_INVALID), sAttackModifiers(""),
+               fAttackDurationSeconds(0), iKeysoundIndex(-1), iDuration(0), HoldResult(), iNoteskin(0) {}
 	void Init()
 	{
 		type = TapNoteType_Empty;
 		subType = TapNoteSubType_Invalid; 
 		source = TapNoteSource_Original;
 		//appearance= TapNoteAppearance_Invalid; //No need since it defaults to Normal anyways
-		noteskinNumber = 0;
-		xOffset = 0;
+		iNoteskin = 0;
 		pn = PLAYER_INVALID, 
 		fAttackDurationSeconds = 0.f; 
 		iKeysoundIndex = -1;
 		iDuration = 0;
-		isFakeNote = false;
 	}
 	TapNote( 
 		TapNoteType type_,
@@ -203,14 +206,17 @@ struct TapNote
 		TapNoteSource source_, 
 		RString sAttackModifiers_,
 		float fAttackDurationSeconds_,
-		int iKeysoundIndex_
+		int iKeysoundIndex_,
+        TapNoteJudge judge_ = TapNoteJudge_Normal
+        //TapNoteAppearance appearance = TapNoteAppearance_Normal
 		):
-		type(type_), subType(subType_), source(source_), result(),
-		pn(PLAYER_INVALID), sAttackModifiers(sAttackModifiers_),
-		fAttackDurationSeconds(fAttackDurationSeconds_),
-		iKeysoundIndex(iKeysoundIndex_), iDuration(0), HoldResult(), noteskinNumber(0)
+            type(type_), subType(subType_), source(source_), result(),
+            pn(PLAYER_INVALID), sAttackModifiers(sAttackModifiers_),
+            fAttackDurationSeconds(fAttackDurationSeconds_),
+            iKeysoundIndex(iKeysoundIndex_), iDuration(0), HoldResult(), iNoteskin(0),
+            judge(judge_), appearance(TapNoteAppearance_Normal)
 	{
-		if (type_ > TapNoteType_Fake )
+		if (type_ >= NUM_TapNoteType )
 		{
 			LOG->Trace("Invalid tap note type %s (most likely) due to random vanish issues. Assume it doesn't need judging.", TapNoteTypeToString(type_).c_str() );
 			type = TapNoteType_Empty;
@@ -232,6 +238,9 @@ struct TapNote
 		COMPARE(iKeysoundIndex);
 		COMPARE(iDuration);
 		COMPARE(pn);
+        COMPARE(iNoteskin);
+        COMPARE(appearance);
+        COMPARE(judge);
 #undef COMPARE
 		return true;
 	}

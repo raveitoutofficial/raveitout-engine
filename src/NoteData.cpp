@@ -394,7 +394,6 @@ bool NoteData::IsHoldNoteAtRow( int iTrack, int iRow, int *pHeadRow ) const
 		case TapNoteType_Attack:
 		case TapNoteType_Lift:
 		case TapNoteType_Bonus:
-		case TapNoteType_Fake:
 			return false;
 
 		case TapNoteType_Empty:
@@ -469,29 +468,29 @@ int NoteData::GetLastRow() const
 bool NoteData::IsTap(const TapNote &tn, const int row) const
 {
 	return (tn.type != TapNoteType_Empty && tn.type != TapNoteType_Mine
-			&& tn.type != TapNoteType_Lift && tn.type != TapNoteType_Fake
-			&& tn.isFakeNote == false
+			&& tn.type != TapNoteType_Lift
 			&& tn.type != TapNoteType_AutoKeysound
-			&& GAMESTATE->GetProcessedTimingData()->IsJudgableAtRow(row));
+			&& !IsFake(tn,row) ); //No need to check IsJudgableAtRow, IsFake already checks.
 }
 
 bool NoteData::IsMine(const TapNote &tn, const int row) const
 {
-	return (tn.type == TapNoteType_Mine
+	return (tn.type == TapNoteType_Mine && tn.judge == TapNoteJudge_Normal
 			&& GAMESTATE->GetProcessedTimingData()->IsJudgableAtRow(row));
 }
 
 bool NoteData::IsLift(const TapNote &tn, const int row) const
 {
-	return (tn.type == TapNoteType_Lift
+	return (tn.type == TapNoteType_Lift && tn.judge != TapNoteJudge_Fake
 			&& GAMESTATE->GetProcessedTimingData()->IsJudgableAtRow(row));
 }
 
 bool NoteData::IsFake(const TapNote &tn, const int row) const
 {
-	return (tn.type == TapNoteType_Fake
-			|| tn.isFakeNote
-			|| !GAMESTATE->GetProcessedTimingData()->IsJudgableAtRow(row));
+	return (
+		tn.judge == TapNoteJudge_Fake
+		|| !GAMESTATE->GetProcessedTimingData()->IsJudgableAtRow(row)
+	);
 }
 
 int NoteData::GetNumTapNotes( int iStartIndex, int iEndIndex ) const
@@ -575,19 +574,19 @@ bool NoteData::RowNeedsAtLeastSimultaneousPresses( int iMinSimultaneousPresses, 
 	for( int t=0; t<GetNumTracks(); t++ )
 	{
 		const TapNote &tn = GetTapNote(t, row);
+		
+		if( tn.judge == TapNoteJudge_Fake )
+			continue;
+			
 		switch( tn.type )
 		{
 			case TapNoteType_Mine:
 			case TapNoteType_Empty:
-			case TapNoteType_Fake:
 			case TapNoteType_Lift: // you don't "press" on a lift.
 			case TapNoteType_AutoKeysound:
 				continue;	// skip these types - they don't count
 			default: break;
 		}
-		//Doesn't count, so skip this.
-		if (tn.isFakeNote)
-			continue;
 		++iNumNotesThisIndex;
 	}
 
@@ -639,11 +638,10 @@ int NoteData::GetNumRowsWithSimultaneousTaps( int iMinTaps, int iStartIndex, int
 		for( int t=0; t<GetNumTracks(); t++ )
 		{
 			const TapNote &tn = GetTapNote(t, r);
-			if (tn.type != TapNoteType_Mine &&     // mines don't count.
+			if ((tn.type != TapNoteType_Mine &&     // mines don't count.
 				tn.type != TapNoteType_Empty &&
-				tn.type != TapNoteType_Fake &&
-				tn.isFakeNote == false &&
-				tn.type != TapNoteType_AutoKeysound)
+				tn.type != TapNoteType_AutoKeysound) &&
+				tn.judge != TapNoteJudge_Fake)
 				iNumNotesThisIndex++;
 		}
 		if( iNumNotesThisIndex >= iMinTaps )

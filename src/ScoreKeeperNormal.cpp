@@ -390,7 +390,11 @@ void ScoreKeeperNormal::HandleTapScore( const TapNote &tn )
 {
 	TapNoteScore tns = tn.result.tns;
 
-	if( tn.type == TapNoteType_Mine )
+	if(tn.judge == TapNoteJudge_Fake)
+	{
+		//Pass
+	}
+	else if( tn.type == TapNoteType_Mine )
 	{
 		if( tns == TNS_HitMine )
 		{

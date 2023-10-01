@@ -28,7 +28,6 @@ static const char *NotePartNames[] = {
 	"TapNote",
 	"TapMine",
 	"TapLift",
-	"TapFake",
 	"TapBonus",
 	"HoldHead",
 	"HoldTail",
@@ -432,10 +431,9 @@ void NoteDisplay::Load(unsigned char noteskinNum, int iColNum, const PlayerState
 
 	// "normal" note types
 	m_TapNote.Load(		sButton, "Tap Note", pn, GameI[0].controller );
-	//m_TapAdd.Load(		sButton, "Tap Addition", pn, GameI.controller );
 	m_TapMine.Load(		sButton, "Tap Mine", pn, GameI[0].controller );
 	m_TapLift.Load(		sButton, "Tap Lift", pn, GameI[0].controller );
-	m_TapFake.Load(		sButton, "Tap Fake", pn, GameI[0].controller );
+	//m_TapAdd.Load(		sButton, "Tap Addition", pn, GameI.controller );
 	m_TapBonus.Load(    sButton, "Tap Bonus",pn, GameI[0].controller );
 
 	// hold types
@@ -1169,7 +1167,7 @@ void NoteDisplay::DrawHold(const TapNote& tn,
 	const HoldNoteResult &Result, bool bIsAddition, float fPercentFadeToFail)
 {
 	//Don't render invisible notes. Don't render notes not for this noteskin.
-	if ( tn.appearance == TapNoteAppearance_Stealth || tn.noteskinNumber != m_pnNoteskinNumber)
+	if ( tn.appearance == TapNoteAppearance_Stealth || tn.iNoteskin != m_pnNoteskinNumber)
 		return;
 
 	int iEndRow = iRow + tn.iDuration;
@@ -1387,11 +1385,11 @@ void NoteDisplay::DrawTap(const TapNote& tn,
 {
 
     //Multiple noteskins isn't working so don't bother
-	/*if (tn.noteskinNumber > 0)
-		LOG->Trace("alt noteskin %i, this noteskin is %i",tn.noteskinNumber,m_pnNoteskinNumber);*/
+	/*if (tn.iNoteskin > 0)
+		LOG->Trace("alt noteskin %i, this noteskin is %i",tn.iNoteskin,m_pnNoteskinNumber);*/
 
     //Don't render invisible notes.
-    // || tn.noteskinNumber != m_pnNoteskinNumber
+    // || tn.iNoteskin != m_pnNoteskinNumber
     if ( tn.appearance == TapNoteAppearance_Stealth )
         return;
 
@@ -1416,11 +1414,6 @@ void NoteDisplay::DrawTap(const TapNote& tn,
 	{
 		pActor = GetTapActor( m_TapMine, NotePart_Mine, fBeat );
 		part = NotePart_Mine;
-	}
-	else if( tn.type == TapNoteType_Fake )
-	{
-		pActor = GetTapActor( m_TapFake, NotePart_Fake, fBeat );
-		part = NotePart_Fake;
 	}
 	else if (tn.type == TapNoteType_Bonus)
 	{
@@ -1586,7 +1579,6 @@ void NoteColumnRenderer::DrawPrimitives()
 			case TapNoteType_Lift:
 			case TapNoteType_Attack:
 			case TapNoteType_AutoKeysound:
-			case TapNoteType_Fake:
 			case TapNoteType_Bonus:
 				if(!tn.result.bHidden)
 				{

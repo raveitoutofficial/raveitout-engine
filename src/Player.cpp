@@ -381,15 +381,15 @@ void Player::Init(
 
 	this->SortByDrawOrder();
 
-	m_pPlayerState = pPlayerState;
-	m_pPlayerStageStats = pPlayerStageStats;
-	m_pLifeMeter = pLM;
-	m_pCombinedLifeMeter = pCombinedLM;
-	m_pScoreDisplay = pScoreDisplay;
-	m_pSecondaryScoreDisplay = pSecondaryScoreDisplay;
-	m_pInventory = pInventory;
-	m_pPrimaryScoreKeeper = pPrimaryScoreKeeper;
-	m_pSecondaryScoreKeeper = pSecondaryScoreKeeper;
+	m_pPlayerState = 			pPlayerState;
+	m_pPlayerStageStats = 		pPlayerStageStats;
+	m_pLifeMeter = 				pLM;
+	m_pCombinedLifeMeter = 		pCombinedLM;
+	m_pScoreDisplay = 			pScoreDisplay;
+	m_pSecondaryScoreDisplay = 	pSecondaryScoreDisplay;
+	m_pInventory = 				pInventory;
+	m_pPrimaryScoreKeeper = 	pPrimaryScoreKeeper;
+	m_pSecondaryScoreKeeper = 	pSecondaryScoreKeeper;
 
 	m_iLastSeenCombo      = 0;
 	m_bSeenComboYet       = false;
@@ -557,6 +557,9 @@ void Player::Init(
  * @return true if it does, false otherwise. */
 static bool NeedsTapJudging( const TapNote &tn )
 {
+	if (tn.judge == TapNoteJudge_Fake)
+		return false;
+
 	switch( tn.type )
 	{
 	DEFAULT_FAIL( tn.type );
@@ -564,11 +567,10 @@ static bool NeedsTapJudging( const TapNote &tn )
 	case TapNoteType_HoldHead:
 	case TapNoteType_Mine:
 	case TapNoteType_Lift:
-		return (tn.result.tns == TNS_None && !tn.isFakeNote);
-	case TapNoteType_HoldTail:
+		return tn.result.tns == TNS_None;
+	case TapNoteType_HoldTail: //TODO: Is HoldTail supposed to be judged? There are judgments in PIU... -RL
 	case TapNoteType_Attack:
 	case TapNoteType_AutoKeysound:
-	case TapNoteType_Fake:
 	case TapNoteType_Empty:
 	case TapNoteType_Bonus:
 		return false;
@@ -581,18 +583,20 @@ static bool NeedsTapJudging( const TapNote &tn )
  * @return true if it does, false otherwise. */
 static bool NeedsHoldJudging( const TapNote &tn )
 {
+	if( tn.judge == TapNoteJudge_Fake )
+		return false;
+		
 	switch( tn.type )
 	{
 	DEFAULT_FAIL( tn.type );
 	case TapNoteType_HoldHead:
-		return (tn.HoldResult.hns == HNS_None && !tn.isFakeNote);
+		return tn.HoldResult.hns == HNS_None;
 	case TapNoteType_Tap:
 	case TapNoteType_HoldTail:
 	case TapNoteType_Mine:
 	case TapNoteType_Lift:
 	case TapNoteType_Attack:
 	case TapNoteType_AutoKeysound:
-	case TapNoteType_Fake:
 	case TapNoteType_Empty:
 	case TapNoteType_Bonus:
 		return false;
@@ -2597,7 +2601,7 @@ void Player::UpdateJudgedRows()
 					*m_pIterUnjudgedMineRows = iter;
 			}
 
-			bool bMineNotHidden = tn.type == TapNoteType_Mine && !tn.result.bHidden;
+			bool bMineNotHidden = tn.type == TapNoteType_Mine && !tn.result.bHidden && tn.judge != TapNoteJudge_Fake;
 			if( !bMineNotHidden )
 				continue;
 
@@ -2680,7 +2684,7 @@ void Player::FlashGhostRow( int iRow )
 		const TapNote &tn = m_NoteData.GetTapNote( iTrack, iRow );
 
 		if(tn.type == TapNoteType_Empty || tn.type == TapNoteType_Mine ||
-			tn.type == TapNoteType_Fake || tn.isFakeNote || tn.result.bHidden)
+			tn.judge == TapNoteJudge_Fake || tn.result.bHidden)
 		{
 			continue;
 		}
@@ -2707,6 +2711,10 @@ void Player::CrossedRows( int iLastRowCrossed, const RageTimer &now )
 		TapNote &tn = *iter;
 		int iRow = iter.Row();
 		int iTrack = iter.Track();
+
+        if (tn.judge == TapNoteJudge_Fake)
+            continue;
+
 		switch( tn.type )
 		{
 			case TapNoteType_HoldHead:
@@ -2769,8 +2777,6 @@ void Player::CrossedRows( int iLastRowCrossed, const RageTimer &now )
 		if( m_pPlayerState->m_PlayerController != PC_HUMAN )
 		{
 			if (tn.type != TapNoteType_Empty &&
-				tn.type != TapNoteType_Fake &&
-				tn.isFakeNote == false &&
 				tn.type != TapNoteType_AutoKeysound &&
 				tn.result.tns == TNS_None &&
 				this->m_Timing->IsJudgableAtRow(iRow) )
@@ -2894,9 +2900,8 @@ void Player::HandleTapRowScore( unsigned row )
 	{
 		const TapNote &tn = m_NoteData.GetTapNote( track, row );
 		// Mines cannot be handled here.
-		if (tn.type == TapNoteType_Empty ||
-			tn.type == TapNoteType_Fake ||
-			tn.isFakeNote ||
+		if (tn.judge == TapNoteJudge_Fake ||
+            tn.type == TapNoteType_Empty ||
 			tn.type == TapNoteType_Bonus ||
 			tn.type == TapNoteType_Mine ||
 			tn.type == TapNoteType_AutoKeysound)
@@ -2986,6 +2991,9 @@ void Player::HandleHoldCheckpoint(int iRow,
 	bNoCheating = false;
 #endif
 
+	// If the MissCombo multiplier is 0, misses don't count
+	if ( iNumHoldsMissedThisRow != 0 && m_Timing->GetMissComboAtRow(iRow) == 0 )
+		return;
 	// WarpSegments and FakeSegments aren't judged in any way.
 	if (!m_Timing->IsJudgableAtRow(iRow))
 		return;

@@ -2212,8 +2212,8 @@ bool ScreenEdit::InputEdit( const InputEventPlus &input, EditButton EditB )
 				case TapNoteType_Tap:	m_selectedTap = TAP_ORIGINAL_BONUS;	break;
 				case TapNoteType_Mine:	m_selectedTap = TAP_ORIGINAL_TAP;	break;
 				case TapNoteType_Lift:	m_selectedTap = TAP_ORIGINAL_MINE;	break;
-				case TapNoteType_Fake:	m_selectedTap = TAP_ORIGINAL_LIFT;	break;
-                case TapNoteType_Bonus:	m_selectedTap = TAP_ORIGINAL_FAKE;	break;
+				//case TapNoteType_Fake:	m_selectedTap = TAP_ORIGINAL_LIFT;	break;
+                case TapNoteType_Bonus:	m_selectedTap = TAP_ORIGINAL_LIFT;	break;
 				DEFAULT_FAIL( m_selectedTap.type );
 			}
 			return true;
@@ -2224,8 +2224,8 @@ bool ScreenEdit::InputEdit( const InputEventPlus &input, EditButton EditB )
 			{
 				case TapNoteType_Tap:	m_selectedTap = TAP_ORIGINAL_MINE;	break;
 				case TapNoteType_Mine:	m_selectedTap = TAP_ORIGINAL_LIFT;	break;
-				case TapNoteType_Lift:	m_selectedTap = TAP_ORIGINAL_FAKE;	break;
-                case TapNoteType_Fake:	m_selectedTap = TAP_ORIGINAL_BONUS;	break;
+				case TapNoteType_Lift:	m_selectedTap = TAP_ORIGINAL_BONUS;	break;
+                //case TapNoteType_Fake:	m_selectedTap = TAP_ORIGINAL_BONUS;	break;
 				case TapNoteType_Bonus:	m_selectedTap = TAP_ORIGINAL_TAP;	break;
 				DEFAULT_FAIL( m_selectedTap.type );
 			}
@@ -2257,28 +2257,15 @@ bool ScreenEdit::InputEdit( const InputEventPlus &input, EditButton EditB )
 	}
 	case EDIT_BUTTON_CHANGE_JUDGE_TYPE:
 	{
-		m_selectedTap.isFakeNote = !m_selectedTap.isFakeNote;
+		//m_selectedTap.isFakeNote = !m_selectedTap.isFakeNote;
+		if (m_selectedTap.judge == TapNoteJudge_Normal)
+			m_selectedTap.judge = TapNoteJudge_Fake;
+		else
+		{
+			m_selectedTap.judge = TapNoteJudge_Normal;
+		}
 		return true;
 	}
-	//musWave meme
-    case EDIT_BUTTON_DECREASE_XOFFSET:
-    {
-        if (m_selectedTap.xOffset == -127)
-            m_selectedTap.xOffset = 127;
-        else
-            m_selectedTap.xOffset--;
-		//LOG->Trace("%i",m_selectedTap.xOffset);
-        return true;
-    }
-    case EDIT_BUTTON_INCREASE_XOFFSET:
-    {
-        if (m_selectedTap.xOffset == 127)
-            m_selectedTap.xOffset = -127;
-        else
-            m_selectedTap.xOffset++;
-		//LOG->Trace("%i",m_selectedTap.xOffset);
-        return true;
-    }
 	case EDIT_BUTTON_CYCLE_SEGMENT_LEFT:
 	{
 		int tmp = enum_add2( this->currentCycleSegment, -1 );
