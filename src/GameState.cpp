@@ -1379,7 +1379,6 @@ float GameState::GetSongPercent( float beat ) const
 
 int GameState::GetNumStagesLeft( PlayerNumber pn ) const
 {
-	//return 999;
 	return m_iPlayerStageTokens[pn];
 }
 
