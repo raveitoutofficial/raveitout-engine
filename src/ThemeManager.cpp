@@ -1446,6 +1446,13 @@ public:
 		return 0;
 	}
 
+    static int SetLanguage(T* p, lua_State* L)
+    {
+        RString m_sLanguage= SArg(1);
+        p->SwitchThemeAndLanguage( p->GetCurThemeName(), m_sLanguage, false );
+        return 0;
+    }
+
 	static int get_theme_fallback_list(T* p, lua_State* L)
 	{
 		lua_createtable(L, g_vThemes.size(), 0);
@@ -1485,6 +1492,7 @@ public:
 		ADD_METHOD( GetMetricNamesInGroup );
 		ADD_METHOD( GetStringNamesInGroup );
 		ADD_METHOD( SetTheme );
+        ADD_METHOD( SetLanguage );
 		ADD_METHOD(get_theme_fallback_list);
 	}
 };
