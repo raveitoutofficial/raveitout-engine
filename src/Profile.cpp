@@ -1677,17 +1677,17 @@ XNode* Profile::SaveGeneralDataCreateNode() const
 		}
 	}
 
-	// Load Lua UserTable from profile
+	// Convert Lua UserTable to XML and save
 	if( !IsMachine() && m_UserTable.IsSet() )
 	{
-		Lua *L = LUA->Get();
-		m_UserTable.PushSelf( L );
-		XNode* pUserTable = XmlFileUtil::XNodeFromTable( L );
-		LUA->Release( L );
+        Lua *L = LUA->Get();
+        m_UserTable.PushSelf( L ); //Push onto the stack
+        XNode* pUserTable = XmlFileUtil::XNodeFromTable( L ); //Convert lua stack obj to XNode ptr
+        LUA->Release( L ); //Release lua handle
 
-		// XXX: XNodeFromTable returns a root node with the name "Layer".
-		pUserTable->m_sName = "UserTable";
-		pGeneralDataNode->AppendChild( pUserTable );
+        // XXX: XNodeFromTable returns a root node with the name "Layer".
+        pUserTable->m_sName = "UserTable";
+        pGeneralDataNode->AppendChild( pUserTable );
 	}
 
 	return pGeneralDataNode;
@@ -1884,6 +1884,7 @@ void Profile::LoadGeneralDataFromNode( const XNode* pNode )
 		else
 			lua_newtable( L );
 
+        m_UserTable.Unset(); // I don't know if SM lua has a garbage collector, so I'll free it just in case.
 		m_UserTable.SetFromStack( L );
 		LUA->Release( L );
 	}

@@ -574,33 +574,6 @@ bool ProfileManager::CreateLocalProfileByID( RString sName, RString sProfileIDIn
 {
     ASSERT( !sName.empty() );
 
-    // Find a directory name that's a number greater than all
-    // existing numbers.  This preserves the "order by create date".
-    // Profile IDs are actually the directory names, so they can be any string,
-    // and we have to handle the case where the user renames one.
-    // Since the user can rename them, they might have any number, wrapping our
-    // counter or setting it to a ridiculous value.  That case must also be
-    // handled. -Kyz
-    int max_profile_number= -1;
-    int first_free_number= 0;
-    vector<RString> profile_ids;
-    GetLocalProfileIDs(profile_ids);
-    FOREACH_CONST(RString, profile_ids, id)
-    {
-        int tmp= 0;
-        if((*id) >> tmp)
-        {
-            // The profile ids are already in order, so we don't have to handle the
-            // case where 5 is encountered before 3.
-            if(tmp == first_free_number)
-            {
-                ++first_free_number;
-            }
-            max_profile_number= max(tmp, max_profile_number);
-        }
-    }
-
-
     // make sure this id doesn't already exist
     ASSERT_M(GetLocalProfile(sProfileIDIn) == NULL,
              ssprintf("creating profile with ID \"%s\" that already exists",

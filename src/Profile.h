@@ -128,7 +128,13 @@ public:
 		
 		ZERO( m_iNumStagesPassedByPlayMode );
 		ZERO( m_iNumStagesPassedByGrade );
-		m_UserTable.Unset();
+
+        //m_UserTable.Unset();
+        //This should always be init, profile load will replace it
+        Lua *L = LUA->Get();
+        lua_newtable( L );
+        m_UserTable.SetFromStack( L );
+        LUA->Release( L );
 		
 		FOREACH_ENUM( StepsType,st )
 			FOREACH_ENUM( RankingCategory,rc )
