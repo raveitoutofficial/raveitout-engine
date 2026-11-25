@@ -16,8 +16,16 @@ extern "C" int sm_main( int argc, char *argv[] );
 // CGFlushDrawable() performs a glFlush() and the docs say not to call glFlush()
 #define NO_GL_FLUSH
 
+#if defined(__aarch64__) || defined(__arm64__)
+#define CPU_AARCH64
+// x86 frame-walking backtrace does not apply; falls back to the stub backtrace.
+#elif defined(__x86_64__)
+#define CPU_X86_64
+#define BACKTRACE_METHOD_X86_DARWIN
+#else
 #define CPU_X86
 #define BACKTRACE_METHOD_X86_DARWIN
+#endif
 #define BACKTRACE_LOOKUP_METHOD_DLADDR
 
 #ifndef MACOSX

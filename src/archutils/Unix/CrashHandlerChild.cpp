@@ -1,5 +1,6 @@
 #define __USE_GNU
 #include "global.h"
+#include <sys/stat.h>
 
 #include <cstdio>
 #include <cstring>
@@ -186,6 +187,7 @@ static void child_process()
 	RString sCrashInfoPath = "/tmp";
 #if defined(MACOSX)
 	sCrashInfoPath = CrashHandler::GetLogsDirectory();
+	mkdir( sCrashInfoPath.c_str(), 0755 ); // ~/Library/Logs/<PRODUCT_ID>; ignore EEXIST
 #else
 	const char *home = getenv( "HOME" );
 	if( home )

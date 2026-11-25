@@ -126,10 +126,53 @@ RString RageDisplay::SetVideoMode( VideoModeParams p, bool &bNeedReloadTextures 
 	return SETVIDEOMODE_FAILED.GetValue() + " " + join(";",vs);
 }
 
+// Frame pacing stats for the FPS log line: the longest frame this second, and how
+// many frames took over 1.5x the median-ish target (missed a refresh = visible hitch).
+static RageTimer g_FrameIntervalTimer;
+static float g_fMaxFrameTime = 0;
+static int g_iLongFrames = 0;
+static float g_fSumFrameTime = 0;
+static float g_fMaxFrameWork = 0;
+static float g_fMovieThisFrame = 0;
+static float g_fMaxMovieUpdate = 0;
+static int g_iOverBudget = 0; // frames whose work took longer than one display refresh
+static int g_iLastRefreshRate = 0;
+
+void RageDisplay::NoteMovieUpdate( float fSeconds )
+{
+	g_fMovieThisFrame += fSeconds;
+}
+
+void RageDisplay::NoteFrameWork( float fSeconds, int iRefreshRate )
+{
+	if( fSeconds > 1.0f )
+		return; // loading screens etc.
+	if( fSeconds > g_fMaxFrameWork )
+		g_fMaxFrameWork = fSeconds;
+	g_iLastRefreshRate = iRefreshRate;
+	if( iRefreshRate > 0 && fSeconds > 1.0f / iRefreshRate )
+		++g_iOverBudget;
+	if( g_fMovieThisFrame > g_fMaxMovieUpdate )
+		g_fMaxMovieUpdate = g_fMovieThisFrame;
+	g_fMovieThisFrame = 0;
+}
+
 void RageDisplay::ProcessStatsOnFlip()
 {
 	g_iFramesRenderedSinceLastCheck++;
 	g_iFramesRenderedSinceLastReset++;
+	{
+		const float fFrame = g_FrameIntervalTimer.GetDeltaTime();
+		if( fFrame < 1.0f ) // ignore the first call / long pauses
+		{
+			g_fSumFrameTime += fFrame;
+			if( fFrame > g_fMaxFrameTime )
+				g_fMaxFrameTime = fFrame;
+			const float fAvg = g_fSumFrameTime / g_iFramesRenderedSinceLastCheck;
+			if( fFrame > fAvg * 1.5f )
+				++g_iLongFrames;
+		}
+	}
 
 	if( g_LastCheckTimer.PeekDeltaTime() >= 1.0f )	// update stats every 1 sec.
 	{
@@ -144,8 +187,16 @@ void RageDisplay::ProcessStatsOnFlip()
 		{
 			RString sStats = GetStats();
 			sStats.Replace( "\n", ", " );
-			LOG->Trace( "%s", sStats.c_str() );
+			LOG->Trace( "%s, max frame %.1f ms, %i long frames, max work %.1f ms, %i over %i Hz budget, max movie %.1f ms",
+				sStats.c_str(), g_fMaxFrameTime * 1000.0f, g_iLongFrames,
+				g_fMaxFrameWork * 1000.0f, g_iOverBudget, g_iLastRefreshRate, g_fMaxMovieUpdate * 1000.0f );
 		}
+		g_fMaxFrameWork = 0;
+		g_iOverBudget = 0;
+		g_fMaxMovieUpdate = 0;
+		g_fMaxFrameTime = 0;
+		g_iLongFrames = 0;
+		g_fSumFrameTime = 0;
 	}
 }
 

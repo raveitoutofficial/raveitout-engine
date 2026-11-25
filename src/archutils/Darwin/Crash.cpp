@@ -3,6 +3,7 @@
 #include "ProductInfo.h"
 #include "arch/ArchHooks/ArchHooks.h"
 #include <CoreServices/CoreServices.h>
+#include <os/log.h>
 #include <sys/types.h>
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
@@ -97,7 +98,7 @@ bool CrashHandler::IsDebuggerPresent()
 
 void CrashHandler::DebugBreak()
 {
-	DebugStr( "\pDebugBreak()" );
+	os_log(OS_LOG_DEFAULT, "DebugBreak()");
 }
 
 /*

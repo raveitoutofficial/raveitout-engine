@@ -28,7 +28,7 @@
       </dict>
     </array>
     <key>CFBundleExecutable</key>
-    <string>PRODUCT_NAME</string>
+    <string>@SM_EXE_NAME@</string>
     <key>CFBundleGetInfoString</key>
     <string>@SM_EXE_NAME@ @SM_VERSION_TRADITIONAL@</string>
     <key>CFBundleIconFile</key>
@@ -51,6 +51,8 @@
     <string>public.app-category.music-games</string>
     <key>LSMinimumSystemVersion</key>
     <string>@CMAKE_OSX_DEPLOYMENT_TARGET_FULL@</string>
+    <key>NSHighResolutionCapable</key>
+    <false/>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright 2001-2015</string>
     <key>NSPrincipalClass</key>

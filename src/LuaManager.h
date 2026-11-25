@@ -148,7 +148,8 @@ namespace LuaHelpers
 		lua_newtable( L );
 		for( unsigned i = 0; i < aIn.size(); ++i )
 		{
-			LuaHelpers::Push( L, aIn[i] );
+			// static_cast: vector<bool>::operator[] returns a proxy in modern libc++.
+			LuaHelpers::Push( L, static_cast<const T &>(aIn[i]) );
 			lua_rawseti( L, -2, i+1 );
 		}
 	}

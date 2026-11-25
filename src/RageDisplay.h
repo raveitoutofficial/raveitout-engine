@@ -396,6 +396,11 @@ public:
 	int GetCumFPS() const; // average FPS since last reset
 	virtual void ResetStats();
 	virtual void ProcessStatsOnFlip();
+	/* Timing for the FPS log line: CPU work per frame (from the last buffer swap
+	 * to the next one, excluding the wait for vsync), and time spent updating
+	 * movie textures (video frame convert + upload) during that frame. */
+	static void NoteFrameWork( float fSeconds, int iRefreshRate );
+	static void NoteMovieUpdate( float fSeconds );
 	virtual RString GetStats() const;
 	void StatsAddVerts( int iNumVertsRendered );
 

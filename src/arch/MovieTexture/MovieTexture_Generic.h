@@ -3,6 +3,9 @@
 
 #include "MovieTexture.h"
 
+#include <cstdint>
+#include <thread>
+
 class FFMpeg_Helper;
 struct RageSurface;
 struct RageTextureLock;
@@ -26,22 +29,21 @@ public:
 	virtual void Close() = 0;
 	virtual void Rewind() = 0;
 
-	/*
-	 * Decode a frame.  Return 1 on success, 0 on EOF, -1 on fatal error.
-	 *
-	 * If we're lagging behind the video, fTargetTime will be the target
-	 * timestamp.  The decoder may skip frames to catch up.  On return,
-	 * the current timestamp must be <= fTargetTime.
-	 *
-	 * Otherwise, fTargetTime will be -1, and the next frame should be
-	 * decoded; skip frames only if necessary to recover from errors.
-	 */
-	virtual int DecodeFrame( float fTargetTime ) = 0;
+	// Decode the next frame.
+	// Return 1 on success, 0 on EOF, -1 on fatal error, -2 on cancel.
+	virtual int DecodeNextFrame() = 0;
+	virtual int DecodeMovie() = 0;
+
+	// Returns true if the frame we want to display has been decoded already.
+	virtual bool IsCurrentFrameReady() = 0;
 
 	/*
 	 * Get the currently-decoded frame.
 	 */
-	virtual void GetFrame( RageSurface *pOut ) = 0;
+	virtual bool GetFrame( RageSurface *pOut ) = 0;
+
+	// Returns true if the frame should be skipped.
+	virtual bool SkipNextFrame() = 0;
 
 	/* Return the dimensions of the image, in pixels (before aspect ratio
 	 * adjustments). */
@@ -72,8 +74,8 @@ public:
 	 * displayed.  The first frame will always be 0. */
 	virtual float GetTimestamp() const = 0;
 
-	/* Get the duration, in seconds, to display the current frame. */
-	virtual float GetFrameDuration() const = 0;
+	// Cancels the decoding of the movie.
+	virtual void Cancel() = 0;
 };
 
 
@@ -90,7 +92,13 @@ public:
 	virtual void Reload();
 
 	virtual void SetPosition( float fSeconds );
-	virtual void DecodeSeconds( float fSeconds );
+
+	// UpdateMovie tells the MovieTexture to update the displayed frame based
+	// on fSeconds passed in. (e.g., 5.9 input means show the frame that should
+	// be displayed 5.9 seconds into the movie).
+	virtual void UpdateMovie( float fSeconds );
+	// SM-RIO's RageTexture/Sprite drive movies through DecodeSeconds(); route it to UpdateMovie.
+	void DecodeSeconds( float fSeconds ) override { UpdateMovie( fSeconds ); }
 	virtual void SetPlaybackRate( float fRate ) { m_fRate = fRate; }
 	void SetLooping( bool bLooping=true ) { m_bLoop = bLooping; }
 	unsigned GetTexHandle() const;
@@ -100,15 +108,13 @@ public:
 private:
 	MovieDecoder *m_pDecoder;
 
-	float m_fRate;
-	enum {
-		FRAME_NONE, /* no frame available; call GetFrame to get one */
-		FRAME_DECODED /* frame decoded; waiting until it's time to display it */
-	} m_ImageWaiting;
-	bool m_bLoop;
-	bool m_bWantRewind;
+	std::unique_ptr<std::thread> decoding_thread;
 
-	enum State { DECODER_QUIT, DECODER_RUNNING } m_State;
+	float m_fRate;
+	bool m_bLoop;
+
+	// If true, halts all decoding and display.
+	bool m_failure = false;
 
 	unsigned m_uTexHandle;
 	RageTextureRenderTarget *m_pRenderTarget;
@@ -121,7 +127,6 @@ private:
 
 	/* The time the movie is actually at: */
 	float m_fClock;
-	bool m_bFrameSkipMode;
 
 	void UpdateFrame();
 
@@ -137,7 +142,7 @@ private:
 /*
  * (c) 2003-2005 Glenn Maynard
  * All rights reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -147,7 +152,7 @@ private:
  * copyright notice(s) and this permission notice appear in all copies of
  * the Software and that both the above copyright notice(s) and this
  * permission notice appear in supporting documentation.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF

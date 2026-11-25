@@ -40,6 +40,10 @@ struct TapScoreDistribution
 		float fCumulativePercent = 0;
 		for( int i=0; i<=TNS_W1; i++ )
 		{
+			// A judgment with no chance must never be picked; without this the
+			// rounding allowance below could return it (~1 in 10,000 notes).
+			if( fPercent[i] <= 0 )
+				continue;
 			fCumulativePercent += fPercent[i];
 			if( fRand <= fCumulativePercent+1e-4 ) // rounding error
 				return (TapNoteScore)i;

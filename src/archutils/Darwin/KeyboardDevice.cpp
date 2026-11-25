@@ -1,5 +1,6 @@
 #include "global.h"
 #include "KeyboardDevice.h"
+#include <ApplicationServices/ApplicationServices.h>
 
 using namespace __gnu_cxx;
 
@@ -175,9 +176,47 @@ void KeyboardDevice::GetButtonPresses( vector<DeviceInput>& vPresses, IOHIDEleme
 
 	if( iter != m_Mapping.end() )
 	{
+		const DeviceButton button = iter->second;
+		if( IsMediaKeyPress(button, value) )
+			return;
 		//LOG->Trace( "Pushed %s", DeviceButtonToString(iter->second).c_str() );
-		vPresses.push_back( DeviceInput(DEVICE_KEYBOARD, iter->second, value, now) );
+		vPresses.push_back( DeviceInput(DEVICE_KEYBOARD, button, value, now) );
 	}
+}
+
+/* Apple keyboards report the top row as F1-F12 at the HID level even when
+ * macOS turns the press into a media key (volume, brightness...). Reading HID
+ * directly, the game would see F11/F12 (sync offset) every time the volume
+ * keys are used. Follow macOS instead: the top row is F-keys only with fn held,
+ * or without fn if "Use F1, F2, etc. keys as standard function keys" is on. */
+static bool FnKeysAreStandardFunctionKeys()
+{
+	Boolean bValid = false;
+	Boolean b = CFPreferencesGetAppBooleanValue( CFSTR("com.apple.keyboard.fnState"),
+		kCFPreferencesAnyApplication, &bValid );
+	return bValid && b;
+}
+
+bool KeyboardDevice::IsMediaKeyPress( DeviceButton button, int value ) const
+{
+	if( button < KEY_F1 || button > KEY_F12 )
+		return false;
+	// Apple USB (0x05AC) or Bluetooth (0x004C) vendor IDs; the built-in keyboard on
+	// Apple Silicon Macs reports vendor 0 but is named "Apple Internal Keyboard".
+	const bool bAppleKeyboard = m_iVendorID == 0x05AC || m_iVendorID == 0x004C ||
+		GetDescription().find( "Apple" ) == 0;
+	if( !bAppleKeyboard )
+		return false;
+
+	if( value == 0 ) // release: swallow it only if the press was a media key
+		return m_MediaKeysDown.erase( button ) > 0;
+
+	const bool bFnHeld = ( CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState) & kCGEventFlagMaskSecondaryFn ) != 0;
+	const bool bIsFunctionKey = FnKeysAreStandardFunctionKeys() ? !bFnHeld : bFnHeld;
+	if( bIsFunctionKey )
+		return false;
+	m_MediaKeysDown.insert( button );
+	return true;
 }
 
 void KeyboardDevice::GetDevicesAndDescriptions( vector<InputDeviceInfo>& vDevices ) const

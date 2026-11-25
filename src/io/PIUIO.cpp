@@ -23,28 +23,26 @@ bool PIUIO_libusb::Open()
 	return OpenInternal( PIUIO_VENDOR_ID, PIUIO_PRODUCT_ID );
 }
 
-bool PIUIO_libusb::Read( uint32_t *pData )
+/* Both directions move PACKET_SIZE (8) bytes. The previous versions read into
+ * and wrote from a 4-byte uint32_t, overrunning it; use real 8-byte buffers. */
+bool PIUIO_libusb::Read( uint8_t pData[PACKET_SIZE] )
 {
-	/* XXX: magic number left over from the ITG disassembly */
-	int iExpected = 8;
-
 	int iResult = m_pDriver->ControlMessage(
 		USB_DIR_IN | USB_TYPE_VENDOR, PIUIO_CTL_REQ,
-		0, 0, (char*)pData, iExpected, REQ_TIMEOUT );
+		0, 0, (char*)pData, PACKET_SIZE, REQ_TIMEOUT );
 
-	return iResult == iExpected;
+	return iResult == PACKET_SIZE;
 }
 
-bool PIUIO_libusb::Write( const uint32_t iData )
+bool PIUIO_libusb::Write( const uint8_t pData[PACKET_SIZE] )
 {
-	/* XXX: magic number left over from the ITG disassembly */
-	int iExpected = 8;
-
+	char buf[PACKET_SIZE];
+	memcpy( buf, pData, PACKET_SIZE );
 	int iResult = m_pDriver->ControlMessage(
 		USB_DIR_OUT | USB_TYPE_VENDOR, PIUIO_CTL_REQ,
-		0, 0, (char*)&iData, iExpected, REQ_TIMEOUT );
+		0, 0, buf, PACKET_SIZE, REQ_TIMEOUT );
 
-	return iResult == iExpected;
+	return iResult == PACKET_SIZE;
 }
 
 bool PIUIO_libusb::BulkReadWrite( uint32_t pData[8] )

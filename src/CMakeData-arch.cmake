@@ -456,9 +456,11 @@ if(WIN32)
 elseif(APPLE)
   list(APPEND SMDATA_ARCH_INPUT_SRC
     "arch/InputHandler/InputHandler_MacOSX_HID.cpp"
+    "arch/InputHandler/InputHandler_PIUIO_Libusb.cpp"
   )
   list(APPEND SMDATA_ARCH_INPUT_HPP
     "arch/InputHandler/InputHandler_MacOSX_HID.h"
+    "arch/InputHandler/InputHandler_PIUIO_Libusb.h"
   )
 else() # Unix/Linux
   if (LINUX)

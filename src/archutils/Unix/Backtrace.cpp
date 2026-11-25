@@ -1,4 +1,7 @@
 #include "global.h"
+#if defined(__APPLE__)
+#include <execinfo.h>
+#endif
 #include "Backtrace.h"
 #include "RageUtil.h"
 
@@ -445,7 +448,7 @@ static bool GetRegionInfo( mach_port_t self, const void *address, vm_address_t &
 	mach_port_t unused;
 	vm_size_t size = 0;
 	vm_address_t start = vm_address_t( address );
-	kern_return_t ret = vm_region( self, &start, &size, VM_REGION_BASIC_INFO_64,
+	kern_return_t ret = vm_region_64( self, &start, &size, VM_REGION_BASIC_INFO_64,
 				       (vm_region_info_t)&info, &infoCnt, &unused );
 	
 	if( ret != KERN_SUCCESS ||
@@ -753,8 +756,19 @@ void GetSignalBacktraceContext( BacktraceContext *ctx, const ucontext_t *uc )
 
 void GetBacktrace( const void **buf, size_t size, const BacktraceContext *ctx )
 {
+#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+	/* Apple Silicon: no hand-rolled frame walker yet. The system unwinder works
+	 * from inside the crash signal handler (it runs on the crashing thread and
+	 * steps through _sigtramp into the faulting frames). ctx is ignored, so
+	 * backtraces of *other* threads aren't available. */
+	if( size < 2 )
+		return;
+	int n = backtrace( (void **) buf, int(size - 1) );
+	buf[n > 0 ? n : 0] = NULL;
+#else
     buf[0] = BACKTRACE_METHOD_NOT_AVAILABLE;
     buf[1] = NULL;
+#endif
 }
 
 #endif

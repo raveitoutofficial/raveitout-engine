@@ -24,6 +24,11 @@ public:
 	void BeginScreen();
 
 	bool ChangeSort( SortOrder new_so, bool allowSameSort = false );	// return true if change successful
+	/* ChangeSort only starts the switch; it finishes in UpdateSwitch once the
+	 * fly-off tween ends, and by default reopens the previous song's section.
+	 * This sets the section to open instead, for that pending switch only. */
+	void SetSectionAfterSort( const RString &group ) { m_sSectionAfterSort = group; m_bHasSectionAfterSort = true; }
+	bool IsSortChangePending() const { return m_WheelState == STATE_FLYING_OFF_BEFORE_NEXT_SORT; }
 	bool NextSort();						// return true if change successful
 	void StartRoulette();
 	void StartRandom();
@@ -70,6 +75,8 @@ protected:
 
 	RString				m_sLastModeMenuItem;
 	SortOrder			m_SortOrder;
+	RString				m_sSectionAfterSort;
+	bool				m_bHasSectionAfterSort;	// set false in Load()
 	RageSound			m_soundChangeSort;
 
 	bool WheelItemIsVisible(int n);

@@ -2,19 +2,26 @@
 #define KEYBOARD_DEVICE_H
 
 #include "HIDDevice.h"
+#include <set>
 
 class KeyboardDevice : public HIDDevice
 {
 private:
 	__gnu_cxx::hash_map<IOHIDElementCookie, DeviceButton> m_Mapping;
+	int m_iVendorID = 0;
+	// F-keys whose press was treated as a media key (volume, brightness...),
+	// so the matching release is swallowed too.
+	mutable std::set<DeviceButton> m_MediaKeysDown;
 
 protected:
+	bool InitDevice( int vid, int pid ) { m_iVendorID = vid; return true; }
 	bool AddLogicalDevice( int usagePage, int usage );
 	void AddElement( int usagePage, int usage, IOHIDElementCookie cookie, const CFDictionaryRef properties );
 	void Open();
 
 public:
 	void GetButtonPresses( vector<DeviceInput>& vPresses, IOHIDElementCookie cookie, int value, const RageTimer& now ) const;
+	bool IsMediaKeyPress( DeviceButton button, int value ) const;
 	void GetDevicesAndDescriptions( vector<InputDeviceInfo>& vDevices ) const;
 
 	static bool DeviceButtonToMacVirtualKey( DeviceButton button, UInt8 &iMacVKOut );

@@ -11,8 +11,10 @@ public:
 
 	bool Open();
 
-	bool Read( uint32_t *pData );
-	bool Write( const uint32_t iData );
+	/* The PIUIO exchanges 8-byte packets in both directions. */
+	static const int PACKET_SIZE = 8;
+	bool Read( uint8_t pData[PACKET_SIZE] );
+	bool Write( const uint8_t pData[PACKET_SIZE] );
 	bool BulkReadWrite( uint32_t pData[8] );
 };
 

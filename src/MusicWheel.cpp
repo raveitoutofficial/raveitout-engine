@@ -72,8 +72,9 @@ MusicWheelItem *MusicWheel::MakeItem()
 	return new MusicWheelItem;
 }
 
-void MusicWheel::Load( RString sType ) 
+void MusicWheel::Load( RString sType )
 {
+	m_bHasSectionAfterSort = false;
 	ROULETTE_SWITCH_SECONDS		.Load(sType,"RouletteSwitchSeconds");
 	ROULETTE_SLOW_DOWN_SWITCHES	.Load(sType,"RouletteSlowDownSwitches");
 	NUM_SECTION_COLORS		.Load(sType,"NumSectionColors");
@@ -1269,20 +1270,31 @@ void MusicWheel::UpdateSwitch()
 
 			SCREENMAN->PostMessageToTopScreen( SM_SortOrderChanged, 0 );
 
-			SetOpenSection( SongUtil::GetSectionNameFromSongAndSort(pPrevSelectedSong, GAMESTATE->m_SortOrder) );
-
-			m_iSelection = 0;
-
-			// Select the previously selected item
-			switch( GAMESTATE->m_SortOrder )
+			if( m_bHasSectionAfterSort )
 			{
-			default:
-				// Look for the last selected song or course
-				SelectSongOrCourse();
-				break;
-			case SORT_MODE_MENU:
-				SelectModeMenuItem();
-				break;
+				/* The theme asked for a specific section (Lua ChangeSort(sort, section)).
+				 * Open it and keep SetOpenSection's selection, instead of reopening
+				 * the previous song's section, which would override the request. */
+				m_bHasSectionAfterSort = false;
+				SetOpenSection( m_sSectionAfterSort );
+			}
+			else
+			{
+				SetOpenSection( SongUtil::GetSectionNameFromSongAndSort(pPrevSelectedSong, GAMESTATE->m_SortOrder) );
+
+				m_iSelection = 0;
+
+				// Select the previously selected item
+				switch( GAMESTATE->m_SortOrder )
+				{
+				default:
+					// Look for the last selected song or course
+					SelectSongOrCourse();
+					break;
+				case SORT_MODE_MENU:
+					SelectModeMenuItem();
+					break;
+				}
 			}
 
 			// Change difficulty for sorts by meter
@@ -1874,7 +1886,20 @@ public:
 		else
 		{
 			SortOrder so = Enum::Check<SortOrder>(L, 1);
-			lua_pushboolean( L, p->ChangeSort( so ) );
+			/* Optional 2nd argument: the section to open once the sort has
+			 * changed. Without it, opening a section right after ChangeSort is
+			 * undone when the delayed switch finishes (see UpdateSwitch). */
+			const bool bHasSection = lua_type(L, 2) == LUA_TSTRING;
+			const RString sSection = bHasSection ? RString(SArg(2)) : RString();
+			const bool bChanged = p->ChangeSort( so );
+			if( bHasSection )
+			{
+				if( bChanged || (p->IsSortChangePending() && GAMESTATE->m_SortOrder == so) )
+					p->SetSectionAfterSort( sSection );	// applied when the switch finishes
+				else if( GAMESTATE->m_SortOrder == so )
+					p->SetOpenSection( sSection );	// already in this sort: open it now
+			}
+			lua_pushboolean( L, bChanged );
 		}
 		return 1;
 	}

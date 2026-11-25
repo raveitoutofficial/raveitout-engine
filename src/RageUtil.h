@@ -200,6 +200,19 @@ static inline T enum_cycle( T val, int iMax, int iAmt = 1 )
  * to force inclusion of this file when swaps are in use (to prevent different dependencies
  * on different systems).
  */
+namespace Endian
+{
+#if defined(__BYTE_ORDER__)
+	inline constexpr bool little = __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__;
+	inline constexpr bool big    = __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__;
+#elif defined(_WIN32)
+	inline constexpr bool little = true;
+	inline constexpr bool big    = false;
+#else
+#error "unknown byte order"
+#endif
+}
+
 #ifdef HAVE_BYTE_SWAPS
 #define Swap32 ArchSwap32
 #define Swap24 ArchSwap24

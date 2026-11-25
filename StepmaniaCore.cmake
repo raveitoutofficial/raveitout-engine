@@ -299,11 +299,12 @@ elseif(MACOSX)
 
   set(SYSTEM_PCRE_FOUND FALSE)
   set(WITH_CRASH_HANDLER TRUE)
-  # Apple Archs needs to be 32-bit for now.
-  # When SDL2 is introduced, this may change.
-  set(CMAKE_OSX_ARCHITECTURES "i386")
-  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.7")
-  set(CMAKE_OSX_DEPLOYMENT_TARGET_FULL "10.7.1")
+  # Native 64-bit build (arm64 on Apple Silicon); overridable from the command line.
+  if(NOT CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+  endif()
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET_FULL "11.0")
 
   find_library(MAC_FRAME_ACCELERATE Accelerate ${CMAKE_SYSTEM_FRAMEWORK_PATH})
   find_library(MAC_FRAME_APPKIT AppKit ${CMAKE_SYSTEM_FRAMEWORK_PATH})
@@ -318,6 +319,10 @@ elseif(MACOSX)
   find_library(MAC_FRAME_IOKIT IOKit ${CMAKE_SYSTEM_FRAMEWORK_PATH})
   find_library(MAC_FRAME_OPENGL OpenGL ${CMAKE_SYSTEM_FRAMEWORK_PATH})
   find_library(MAC_FRAME_QUICKTIME QuickTime ${CMAKE_SYSTEM_FRAMEWORK_PATH})
+  find_library(MAC_FRAME_COREMEDIA CoreMedia ${CMAKE_SYSTEM_FRAMEWORK_PATH})
+  find_library(MAC_FRAME_COREVIDEO CoreVideo ${CMAKE_SYSTEM_FRAMEWORK_PATH})
+  find_library(MAC_FRAME_VIDEOTOOLBOX VideoToolbox ${CMAKE_SYSTEM_FRAMEWORK_PATH})
+  find_library(MAC_FRAME_SECURITY Security ${CMAKE_SYSTEM_FRAMEWORK_PATH})
 
   mark_as_advanced(
     MAC_FRAME_ACCELERATE

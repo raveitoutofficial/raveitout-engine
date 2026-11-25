@@ -6,10 +6,19 @@
 #import "RageDisplay_OGL_Helpers.h"
 #import "arch/ArchHooks/ArchHooks.h"
 
+#include <cstddef>
+#include <cstdint>
+
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/OpenGL.h>
 #import <OpenGL/gl.h>
 #import <mach-o/dyld.h>
+#import <CoreVideo/CoreVideo.h>
+
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 
 // Bad header!
 extern "C" {
@@ -17,8 +26,8 @@ extern "C" {
 }
 
 
-static const unsigned int g_iStyleMask = NSTitledWindowMask | NSClosableWindowMask |
-					 NSMiniaturizableWindowMask | NSResizableWindowMask;
+static const unsigned int g_iStyleMask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+					 NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
 static bool g_bResized;
 static int g_iWidth;
 static int g_iHeight;
@@ -30,13 +39,104 @@ class AutoreleasePool
 	AutoreleasePool( const AutoreleasePool& );
 	AutoreleasePool &operator=( const AutoreleasePool& );
 	NSAutoreleasePool *m_Pool;
-	
+
 public:
 	AutoreleasePool() { m_Pool = [[NSAutoreleasePool alloc] init]; }
 	~AutoreleasePool() { [m_Pool release]; }
 };
 
 #define POOL AutoreleasePool SM_UNIQUE_NAME(pool)
+
+/* Frame pacing to the real display refresh.
+ *
+ * OpenGL here runs on top of Metal and the window compositor, and with swap
+ * interval 1 CGLFlushDrawable does not always block once per refresh: on the
+ * MacBook's built-in 60 Hz panel it returned at ~120 Hz, so the game drew
+ * twice per refresh and the compositor dropped every other frame unevenly
+ * (visible stutter). On a 100 Hz external monitor it paced correctly.
+ *
+ * A CVDisplayLink ticks at the actual refresh of the display the window is on.
+ * Before each swap we wait until at least one refresh has happened since the
+ * previous swap, so we never present faster than the display can show. A
+ * frame that already took longer than a refresh doesn't wait. */
+namespace
+{
+	std::mutex g_VblankMutex;
+	std::condition_variable g_VblankCond;
+	std::uint64_t g_iVblankCount = 0;
+	std::uint64_t g_iVblankAtLastSwap = 0;
+	CVDisplayLinkRef g_DisplayLink = nullptr;
+	std::atomic<bool> g_bRetargetDisplayLink( true );
+
+	CVReturn DisplayLinkCallback( CVDisplayLinkRef, const CVTimeStamp *, const CVTimeStamp *,
+		CVOptionFlags, CVOptionFlags *, void * )
+	{
+		{
+			std::lock_guard<std::mutex> lk( g_VblankMutex );
+			++g_iVblankCount;
+		}
+		g_VblankCond.notify_all();
+		return kCVReturnSuccess;
+	}
+
+	// Point the display link at the display showing the window (creating it the first time).
+	void RetargetDisplayLink( NSWindow *window )
+	{
+		__block CGDirectDisplayID display = CGMainDisplayID();
+		dispatch_sync( dispatch_get_main_queue(), ^{
+			NSScreen *screen = [window screen];
+			if( screen == nil )
+				screen = [NSScreen mainScreen];
+			NSNumber *num = [[screen deviceDescription] objectForKey:@"NSScreenNumber"];
+			if( num != nil )
+				display = [num unsignedIntValue];
+		});
+
+		if( g_DisplayLink == nullptr )
+		{
+			if( CVDisplayLinkCreateWithCGDisplay( display, &g_DisplayLink ) != kCVReturnSuccess )
+			{
+				g_DisplayLink = nullptr;
+				return;
+			}
+			CVDisplayLinkSetOutputCallback( g_DisplayLink, DisplayLinkCallback, nullptr );
+		}
+		else
+		{
+			CVDisplayLinkSetCurrentCGDisplay( g_DisplayLink, display );
+		}
+		if( !CVDisplayLinkIsRunning( g_DisplayLink ) )
+			CVDisplayLinkStart( g_DisplayLink );
+	}
+
+	void StopDisplayLink()
+	{
+		if( g_DisplayLink == nullptr )
+			return;
+		CVDisplayLinkStop( g_DisplayLink );
+		CVDisplayLinkRelease( g_DisplayLink );
+		g_DisplayLink = nullptr;
+	}
+
+	// Block until the display has refreshed at least once since the previous swap.
+	void WaitForRefreshSinceLastSwap()
+	{
+		std::unique_lock<std::mutex> lk( g_VblankMutex );
+		// Time out so a stopped link (display asleep, unplugged) can't hang the game.
+		g_VblankCond.wait_for( lk, std::chrono::milliseconds(50),
+			[]{ return g_iVblankCount > g_iVblankAtLastSwap; } );
+		g_iVblankAtLastSwap = g_iVblankCount;
+	}
+}
+
+// Borderless windows can't become key by default; fullscreen uses one, and
+// the game needs key status (focus) to accept input.
+@interface SMWindow : NSWindow
+@end
+@implementation SMWindow
+- (BOOL) canBecomeKeyWindow { return YES; }
+- (BOOL) canBecomeMainWindow { return YES; }
+@end
 
 // Window delegate class
 @interface SMWindowDelegate : NSObject
@@ -48,8 +148,7 @@ public:
 - (void) windowDidResignKey:(NSNotification *)aNotification;
 - (void) windowWillClose:(NSNotification *)aNotification;
 - (void) windowDidResize:(NSNotification *)aNotification;
-// XXX maybe use whichever screen contains the window? Hard for me to test though.
-//- (void) windowDidChangeScreen:(NSNotification *)aNotification;
+- (void) windowDidChangeScreen:(NSNotification *)aNotification;
 
 // Helper methods to perform actions on the main thread.
 - (void) setupWindow;
@@ -74,11 +173,17 @@ public:
 	ArchHooks::SetUserQuit();
 }
 
+- (void) windowDidChangeScreen:(NSNotification *)aNotification
+{
+	// Pace frames to the refresh of the display the window moved to.
+	g_bRetargetDisplayLink = true;
+}
+
 - (void) windowDidResize:(NSNotification *)aNotification
 {
 	id window = [aNotification object];
-	NSSize size = [NSWindow contentRectForFrameRect:[window frame] styleMask:g_iStyleMask].size;
-	
+	NSSize size = [window contentRectForFrameRect:[window frame]].size;
+
 	LockMut( g_ResizeLock );
 	g_bResized = true;
 	g_iWidth = int( size.width );
@@ -88,13 +193,12 @@ public:
 - (void) setupWindow
 {
 	NSRect rect = NSMakeRect( 0, 0, 0, 0 );
-	m_Window = [[NSWindow alloc] initWithContentRect:rect
+	m_Window = [[SMWindow alloc] initWithContentRect:rect
 					       styleMask:g_iStyleMask
 						 backing:NSBackingStoreBuffered
 						   defer:YES];
-	
+
 	[m_Window setExcludedFromWindowsMenu:YES];
-	[m_Window useOptimizedDrawing:YES];
 	[m_Window setReleasedWhenClosed:NO];
 	[m_Window setDelegate:static_cast<id<NSWindowDelegate> >(self)];
 }
@@ -103,17 +207,35 @@ public:
 {
 	[m_Window setDelegate:nil];
 	[m_Window close];
-	[m_Window release];	
+	[m_Window release];
 }
 
 - (void) setParams:(NSValue *)params
 {
 	const VideoModeParams &p = *(const VideoModeParams *)[params pointerValue];
-	NSRect contentRect = { { 0, 0 }, { static_cast<CGFloat>(p.width), static_cast<CGFloat>(p.height) } };	
 
-	[m_Window setContentSize:contentRect.size];
-	[m_Window setTitle:[NSString stringWithUTF8String:p.sWindowTitle.c_str()]];		
-	[m_Window center];
+	[m_Window setTitle:[NSString stringWithUTF8String:p.sWindowTitle.c_str()]];
+
+	if( p.windowed )
+	{
+		[NSApp setPresentationOptions:NSApplicationPresentationDefault];
+		[m_Window setStyleMask:g_iStyleMask];
+		[m_Window setLevel:NSNormalWindowLevel];
+		NSRect contentRect = { { 0, 0 }, { static_cast<CGFloat>(p.width), static_cast<CGFloat>(p.height) } };
+		[m_Window setContentSize:contentRect.size];
+		[m_Window center];
+	}
+	else
+	{
+		/* Fullscreen: a borderless window covering the whole main screen, with
+		 * the menu bar and Dock hidden. The old approach (capture the display,
+		 * switch its mode, -[NSOpenGLContext setFullScreen]) has done nothing
+		 * since macOS 10.7 and leaves a black screen. The game renders at the
+		 * screen's size; the requested resolution is not forced on the display. */
+		[NSApp setPresentationOptions:NSApplicationPresentationHideDock | NSApplicationPresentationHideMenuBar];
+		[m_Window setStyleMask:NSWindowStyleMaskBorderless];
+		[m_Window setFrame:[[NSScreen mainScreen] frame] display:YES];
+	}
 	[m_Window makeKeyAndOrderFront:nil];
 }
 @end
@@ -146,7 +268,7 @@ static NSOpenGLContext *CreateOGLContext( GLContextType type, int iColorSize, in
 		NSOpenGLPixelFormatAttribute(0)  // Must be at the end.
 	};
 	const int n = 9; // The first noncommon index.
-	
+
 	switch( type )
 	{
 	case WINDOWED:
@@ -164,22 +286,22 @@ static NSOpenGLContext *CreateOGLContext( GLContextType type, int iColorSize, in
 		attrs[n+1] = NSOpenGLPFAPixelBuffer;
 		break;
 	}
-	
+
 	NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-	
+
 	if( !pixelFormat )
 		return nil;
-	
+
 	NSOpenGLContext *context = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:share];
-	
+
 	bShared = share && context;
 	if( !context )
 		context = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:nil];
-	
+
 	[pixelFormat release];
-	
+
 	return context;
-}		
+}
 
 
 class RenderTarget_MacOSX : public RenderTarget
@@ -191,7 +313,7 @@ public:
 	unsigned GetTexture() const { return m_iTexHandle; }
 	void StartRenderingTo();
 	void FinishRenderingTo();
-	
+
 private:
 	NSOpenGLContext *m_ShareContext, *m_OldContext, *m_PBufferContext;
 	GLuint m_iTexHandle;
@@ -221,7 +343,7 @@ void RenderTarget_MacOSX::Create( const RenderTargetParam &param, int &iTextureW
 	POOL;
 	m_iWidth = param.iWidth;
 	m_iHeight = param.iHeight;
-	
+
 	// PBuffer needs to be a power of 2.
 	int iTextureWidth = power_of_two( param.iWidth );
 	int iTextureHeight = power_of_two( param.iHeight );
@@ -234,7 +356,7 @@ void RenderTarget_MacOSX::Create( const RenderTargetParam &param, int &iTextureW
 									       pixelsWide:iTextureWidth
 									       pixelsHigh:iTextureHeight];
 	DEBUG_ASSERT( PBuffer );
-	
+
 	// Create an OGL context.
 	bool bShared = false;
 	m_PBufferContext = CreateOGLContext( PIXEL_BUFFER, 24, param.bWithAlpha? 8:0, param.bWithDepthBuffer? 16:0, m_ShareContext, bShared );
@@ -243,22 +365,22 @@ void RenderTarget_MacOSX::Create( const RenderTargetParam &param, int &iTextureW
 	[m_PBufferContext setPixelBuffer:PBuffer cubeMapFace:0 mipMapLevel:0
 		    currentVirtualScreen:[m_ShareContext currentVirtualScreen]];
 	[PBuffer release]; // XXX: Hopefully this is retained by the PBufferContext.
-	
+
 	glGenTextures( 1, &m_iTexHandle );
 	glBindTexture( GL_TEXTURE_2D, m_iTexHandle );
-	
+
 	while( glGetError() != GL_NO_ERROR )
 		;
-	
+
 	iTextureWidthOut = iTextureWidth;
 	iTextureHeightOut = iTextureHeight;
-	
+
 	glTexImage2D( GL_TEXTURE_2D, 0, param.bWithAlpha? GL_RGBA8:GL_RGB8,
 		      iTextureWidth, iTextureHeight, 0, param.bWithAlpha? GL_RGBA:GL_RGB,
-		      GL_UNSIGNED_BYTE, NULL );
+		      GL_UNSIGNED_BYTE, nil);
 	GLenum error = glGetError();
 	ASSERT_M(error == GL_NO_ERROR, RageDisplay_Legacy_Helpers::GLToString(error));
-	
+
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
@@ -277,38 +399,41 @@ void RenderTarget_MacOSX::FinishRenderingTo()
 {
 	DEBUG_ASSERT( m_OldContext );
 	glBindTexture( GL_TEXTURE_2D, m_iTexHandle );
-	
+
 	while( glGetError() != GL_NO_ERROR )
 		;
-	
+
 	glCopyTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, 0, 0, m_iWidth, m_iHeight );
-	
+
 	GLenum error = glGetError();
 	ASSERT_M( error == GL_NO_ERROR, RageDisplay_Legacy_Helpers::GLToString(error) );
-	
+
 	glBindTexture( GL_TEXTURE_2D, 0 );
-	
+
 	[m_OldContext makeCurrentContext];
 	m_OldContext = nil;
 }
 
 
-LowLevelWindow_MacOSX::LowLevelWindow_MacOSX() : m_Context(nil), m_BGContext(nil), m_CurrentDisplayMode(NULL), m_DisplayID(0)
+LowLevelWindow_MacOSX::LowLevelWindow_MacOSX() : m_Context(nil), m_BGContext(nil), m_CurrentDisplayMode(nil), m_DisplayID(0)
 {
 	POOL;
 	m_WindowDelegate = [[SMWindowDelegate alloc] init];
 	[m_WindowDelegate performSelectorOnMainThread:@selector(setupWindow) withObject:nil waitUntilDone:YES];
-	
+
 	m_CurrentParams.windowed = true; // We are essentially windowed to begin with.
 	SetActualParamsFromMode( CGDisplayCurrentMode(kCGDirectMainDisplay) );
-	HOOKS->SetHasFocus( [NSApp isActive] );
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        HOOKS->SetHasFocus( [NSApp isActive] );;
+    });
 }
 
 LowLevelWindow_MacOSX::~LowLevelWindow_MacOSX()
 {
 	POOL;
+	StopDisplayLink();
 	ShutDownFullScreen();
-		
+
 	[m_Context clearDrawable];
 	[m_Context release];
 	[m_BGContext clearDrawable];
@@ -322,13 +447,13 @@ void *LowLevelWindow_MacOSX::GetProcAddress( RString s )
 	// http://developer.apple.com/qa/qa2001/qa1188.html
 	// Both functions mentioned in there are deprecated in 10.4.
 	const RString& symbolName( '_' + s );
-	const uint32_t count = _dyld_image_count();
-	NSSymbol symbol = NULL;
-	const uint32_t options = NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR;
-	
-	for( uint32_t i = 0; i < count && !symbol; ++i )
+	const std::uint32_t count = _dyld_image_count();
+	NSSymbol symbol = nil;
+	const std::uint32_t options = NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR;
+
+	for( std::uint32_t i = 0; i < count && !symbol; ++i )
 		symbol = NSLookupSymbolInImage( _dyld_get_image_header(i), symbolName, options );
-	return symbol ? NSAddressOfSymbol( symbol ) : NULL;
+	return symbol ? NSAddressOfSymbol( symbol ) : nil;
 }
 
 RString LowLevelWindow_MacOSX::TryVideoMode( const VideoModeParams& p, bool& newDeviceOut )
@@ -340,32 +465,47 @@ RString LowLevelWindow_MacOSX::TryVideoMode( const VideoModeParams& p, bool& new
 	m_CurrentParams.interlaced = p.interlaced;
 	m_CurrentParams.PAL = p.PAL;
 	m_CurrentParams.fDisplayAspectRatio = p.fDisplayAspectRatio;
-	
+
+	g_bRetargetDisplayLink = true; // the window may now be on another display or refresh rate
+
 #define X(x) p.x != m_CurrentParams.x
 	const bool bRebuildContext = X(bpp) || X(windowed) || !m_Context;
 	const bool bChangeMode = X(width) || X(height) || X(rate) || bRebuildContext;
 	const bool bChangeVsync = X(vsync) || bRebuildContext;
 #undef X
-	
+
 	if( !bChangeMode && !bChangeVsync )
 		return RString();
-	
+
 	POOL;
 	newDeviceOut = false;
-	
+
 	ASSERT( p.bpp == 16 || p.bpp == 32 );
-	
-	// If we don't have focus, we cannot be full screen.
-	if( p.windowed || !HOOKS->AppHasFocus() )
-	{		
+
+	// Windowed and fullscreen both render into the window's view; fullscreen is a
+	// borderless screen-sized window (see SMWindowDelegate setParams). The legacy
+	// full-screen path below is kept but no longer used.
+	if( true )
+	{
 		if( bRebuildContext )
 		{
 			bool bShared;
 			NSOpenGLContext *newContext = CreateOGLContext( WINDOWED, p.bpp == 16? 16:24, p.bpp == 16? 1:8, 16, m_Context, bShared );
-			
+
 			if( !newContext )
 				return "Failed to create OGL context.";
 			ShutDownFullScreen();
+			// Detach the old contexts from the window before releasing them. Both
+			// windowed and fullscreen now draw into the same view, so a released
+			// but still-attached context tears down the surface the new context is
+			// about to present to (crash in CGLFlushDrawable/SkyLight on toggle).
+			if( m_Context || m_BGContext )
+			{
+				dispatch_sync(dispatch_get_main_queue(), ^{
+					[m_Context clearDrawable];
+					[m_BGContext clearDrawable];
+				});
+			}
 			[m_Context release];
 			m_Context = newContext;
 			newDeviceOut = !bShared;
@@ -373,20 +513,23 @@ RString LowLevelWindow_MacOSX::TryVideoMode( const VideoModeParams& p, bool& new
 			[m_BGContext release];
 			m_BGContext = nil;
 			m_BGContext = CreateOGLContext( WINDOWED, p.bpp == 16? 16:24, p.bpp == 16? 1:8, 16, m_Context, bShared );
-			
+
 			if( m_BGContext && !bShared )
 			{
 				[m_BGContext release];
 				m_BGContext = nil;
 			}
 		}
-		
+
 		[m_WindowDelegate performSelectorOnMainThread:@selector(setParams:) withObject:[NSValue valueWithPointer:&p] waitUntilDone:YES];
-		[m_Context setView:[((SMWindowDelegate *)m_WindowDelegate)->m_Window contentView]];
-		[m_Context update];
-		[m_Context makeCurrentContext];
-		m_CurrentParams.windowed = true;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [m_Context setView:[((SMWindowDelegate *)m_WindowDelegate)->m_Window contentView]];
+            [m_Context update];
+        });
+        [m_Context makeCurrentContext];
+		m_CurrentParams.windowed = true; // measure the window's view, not the display
 		SetActualParamsFromMode( CGDisplayCurrentMode(kCGDirectMainDisplay) );
+		m_CurrentParams.windowed = p.windowed;
 		m_CurrentParams.vsync = p.vsync; // hack
 
 		return RString();
@@ -394,7 +537,7 @@ RString LowLevelWindow_MacOSX::TryVideoMode( const VideoModeParams& p, bool& new
 	if( bChangeMode )
 	{
 		int result = ChangeDisplayMode( p );
-	
+
 		if( result )
 			return ssprintf( "Failed to switch to full screen:%d x %d @ %d. Error %d.",
 					 p.width, p.height, p.rate, result );
@@ -404,7 +547,7 @@ RString LowLevelWindow_MacOSX::TryVideoMode( const VideoModeParams& p, bool& new
 	{
 		bool bShared;
 		NSOpenGLContext *newContext = CreateOGLContext( FULL_SCREEN, p.bpp == 16? 16:24, p.bpp == 16? 1:8, 16, m_Context, bShared );
-		
+
 		if( !newContext )
 			return "Failed to create full screen OGL context.";
 		[m_Context clearDrawable];
@@ -414,101 +557,101 @@ RString LowLevelWindow_MacOSX::TryVideoMode( const VideoModeParams& p, bool& new
 		m_CurrentParams.bpp = p.bpp;
 		[m_BGContext release];
 		m_BGContext = CreateOGLContext( FULL_SCREEN, p.bpp == 16? 16:24, p.bpp == 16? 1:8, 16, m_Context, bShared );
-		
+
 		if( m_BGContext && !bShared )
 		{
 			[m_BGContext release];
 			m_BGContext = nil;
 		}
 	}
-	
-	[m_Context setFullScreen];
-	[m_Context update];
+	dispatch_sync(dispatch_get_main_queue(), ^{
+        [m_Context setFullScreen];
+        [m_Context update];
+    });
 	[m_Context makeCurrentContext];
-	
+
 	if( bChangeVsync )
 	{
 		GLint swap = p.vsync ? 1 : 0;
 		[m_Context setValues:&swap forParameter:NSOpenGLCPSwapInterval];
 		m_CurrentParams.vsync = p.vsync;
 	}
-	
+
 	return RString();
 }
 
 void LowLevelWindow_MacOSX::ShutDownFullScreen()
 {
-	if( m_CurrentParams.windowed )
+	if( m_CurrentParams.windowed || m_CurrentDisplayMode == nil )
 		return;
-	ASSERT( m_CurrentDisplayMode );
-	
+
 	// Clear the front and back framebuffers before switching out of FullScreen mode.
 	// (This is not strictly necessary, but avoids an untidy flash of garbage.)
 	glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 	glClear( GL_COLOR_BUFFER_BIT );
 	[m_Context flushBuffer];
 	glClear( GL_COLOR_BUFFER_BIT );
-	[m_Context flushBuffer];	
-	
+	[m_Context flushBuffer];
+
 	[NSOpenGLContext clearCurrentContext];
 	[m_Context clearDrawable];
 	[m_BGContext clearDrawable];
-	
+
 	CGDisplayErr err = CGDisplaySwitchToMode( kCGDirectMainDisplay, m_CurrentDisplayMode );
-	
+
 	ASSERT( err == kCGErrorSuccess );
 	CGDisplayShowCursor( kCGDirectMainDisplay );
 	err = CGDisplayRelease( m_DisplayID );
 	ASSERT( err == kCGErrorSuccess );
 	SetActualParamsFromMode( m_CurrentDisplayMode );
 	// We don't own this so we cannot release it.
-	m_CurrentDisplayMode = NULL;
+	m_CurrentDisplayMode = nil;
 	m_CurrentParams.windowed = true;
 }
 
 int LowLevelWindow_MacOSX::ChangeDisplayMode( const VideoModeParams& p )
-{	
-	CFDictionaryRef mode = NULL;
+{
+	CFDictionaryRef mode = nil;
 	CFDictionaryRef newMode;
 	CGDisplayErr err;
-	
+
 	if( !m_CurrentDisplayMode )
 	{
 		m_DisplayID = CGMainDisplayID();
 		if( (err = CGDisplayCapture(m_DisplayID)) != kCGErrorSuccess )
 			return err;
 		// Only hide the first time we go to full screen.
-		CGDisplayHideCursor( kCGDirectMainDisplay );	
+		CGDisplayHideCursor( kCGDirectMainDisplay );
 		mode = CGDisplayCurrentMode( kCGDirectMainDisplay );
 	}
-	
+
 	if( p.rate == REFRESH_DEFAULT )
-		newMode = CGDisplayBestModeForParameters( kCGDirectMainDisplay, p.bpp, p.width, p.height, NULL );
+		newMode = CGDisplayBestModeForParameters( kCGDirectMainDisplay, p.bpp, p.width, p.height, nil);
 	else
 		newMode = CGDisplayBestModeForParametersAndRefreshRate( kCGDirectMainDisplay, p.bpp,
-									p.width, p.height, p.rate, NULL );
-	
-	
+									p.width, p.height, p.rate, nil);
+
+
 	err = CGDisplaySwitchToMode( kCGDirectMainDisplay, newMode );
-	
+
 	if( err != kCGErrorSuccess )
 		return err; // We don't own mode, don't release it.
-	
+
 	if( !m_CurrentDisplayMode )
 		m_CurrentDisplayMode = mode;
 	m_CurrentParams.windowed = false;
 	SetActualParamsFromMode( newMode );
-	
+
 	return 0;
 }
 
 // http://lukassen.wordpress.com/2010/01/18/taming-snow-leopard-cgdisplaybitsperpixel-deprication/
-static size_t GetDisplayBitsPerPixel( CGDirectDisplayID displayId )
+static std::size_t GetDisplayBitsPerPixel( CGDirectDisplayID displayId )
 {
-	
+
 	CGDisplayModeRef mode = CGDisplayCopyDisplayMode(displayId);
-	size_t depth = 0;
-	
+	std::size_t depth = 0;
+
 	CFStringRef pixEnc = CGDisplayModeCopyPixelEncoding(mode);
 	if(CFStringCompare(pixEnc, CFSTR(IO32BitDirectPixels), kCFCompareCaseInsensitive) == kCFCompareEqualTo)
 		depth = 32;
@@ -516,7 +659,10 @@ static size_t GetDisplayBitsPerPixel( CGDirectDisplayID displayId )
 		depth = 16;
 	else if(CFStringCompare(pixEnc, CFSTR(IO8BitIndexedPixels), kCFCompareCaseInsensitive) == kCFCompareEqualTo)
 		depth = 8;
-	
+
+    CFRelease(pixEnc);
+    CGDisplayModeRelease(mode);
+
 	return depth;
 
 }
@@ -526,7 +672,7 @@ void LowLevelWindow_MacOSX::SetActualParamsFromMode( CFDictionaryRef mode )
 	SInt32 rate;
 	bool ret = CFNumberGetValue( (CFNumberRef)CFDictionaryGetValue(mode, CFSTR("RefreshRate")),
 				     kCFNumberSInt32Type, &rate );
-	
+
 	if( !ret || rate == 0)
 		rate = 60;
 	m_CurrentParams.rate = rate;
@@ -541,8 +687,11 @@ void LowLevelWindow_MacOSX::SetActualParamsFromMode( CFDictionaryRef mode )
 	}
 	else
 	{
-		NSSize size = [[((SMWindowDelegate *)m_WindowDelegate)->m_Window contentView] frame].size;
-		
+        __block NSSize size;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            size = [[((SMWindowDelegate *)m_WindowDelegate)->m_Window contentView] frame].size;
+        });
+
 		m_CurrentParams.width = int(size.width);
 		m_CurrentParams.height = int(size.height);
 	}
@@ -553,7 +702,7 @@ void LowLevelWindow_MacOSX::SetActualParamsFromMode( CFDictionaryRef mode )
 static int GetIntValue( CFTypeRef r )
 {
 	int ret;
-	
+
 	if( !r || CFGetTypeID(r) != CFNumberGetTypeID() || !CFNumberGetValue(CFNumberRef(r), kCFNumberIntType, &ret) )
 		return 0;
 	return ret;
@@ -612,6 +761,13 @@ void LowLevelWindow_MacOSX::GetDisplaySpecs( DisplaySpecs &specs ) const
 
 void LowLevelWindow_MacOSX::SwapBuffers()
 {
+	if( m_CurrentParams.vsync )
+	{
+		if( g_bRetargetDisplayLink.exchange( false ) )
+			RetargetDisplayLink( ((SMWindowDelegate *)m_WindowDelegate)->m_Window );
+		if( g_DisplayLink != nullptr )
+			WaitForRefreshSinceLastSwap();
+	}
 	CGLFlushDrawable( CGLGetCurrentContext() );
 }
 
@@ -619,7 +775,7 @@ void LowLevelWindow_MacOSX::Update()
 {
 	// Keep the system from sleeping or the screen saver from activating.
 	UpdateSystemActivity( IdleActivity );
-	
+
 	LockMutex lock( g_ResizeLock );
 	if( likely(!g_bResized) )
 		return;
@@ -629,7 +785,10 @@ void LowLevelWindow_MacOSX::Update()
 	m_CurrentParams.width = g_iWidth;
 	m_CurrentParams.height = g_iHeight;
 	lock.Unlock(); // Unlock before calling ResolutionChanged().
-	[m_Context update];
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        [m_Context update];
+    });
+
 	DISPLAY->ResolutionChanged();
 }
 
@@ -650,7 +809,7 @@ void LowLevelWindow_MacOSX::BeginConcurrentRendering()
 /*
  * (c) 2005-2006, 2008 Steve Checkoway
  * All rights reserved.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -660,7 +819,7 @@ void LowLevelWindow_MacOSX::BeginConcurrentRendering()
  * copyright notice(s) and this permission notice appear in all copies of
  * the Software and that both the above copyright notice(s) and this
  * permission notice appear in supporting documentation.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF

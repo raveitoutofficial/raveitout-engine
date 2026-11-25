@@ -217,6 +217,12 @@ elseif(APPLE)
 
   sm_add_compile_definition("${SM_EXE_NAME}" _XOPEN_SOURCE)
 
+  # Non-Xcode generators ignore GCC_PREFIX_HEADER; force the Darwin prefix header in.
+  if(NOT CMAKE_GENERATOR STREQUAL "Xcode")
+    target_compile_options("${SM_EXE_NAME}" PRIVATE
+      "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/archutils/Darwin/StepMania.pch")
+  endif()
+
   if (${HAS_FFMPEG})
     sm_add_compile_definition("${SM_EXE_NAME}" HAVE_FFMPEG)
   endif()
@@ -441,7 +447,6 @@ elseif(APPLE)
     ${MAC_FRAME_CARBON}
     ${MAC_FRAME_COCOA}
     ${MAC_FRAME_IOKIT}
-    ${MAC_FRAME_QUICKTIME}
     ${MAC_FRAME_OPENGL}
     ${MAC_FRAME_COREFOUNDATION}
     ${MAC_FRAME_AUDIOTOOLBOX}
@@ -449,7 +454,7 @@ elseif(APPLE)
     ${MAC_FRAME_COREAUDIO}
     ${MAC_FRAME_CORESERVICES}
     "ogg"
-    "theora"
+    "vorbisfile"
     "vorbis"
   )
   list(APPEND SMDATA_LINK_LIB
@@ -460,10 +465,16 @@ elseif(APPLE)
 
   if(HAS_FFMPEG)
     list(APPEND SMDATA_LINK_LIB
-      "${SM_FFMPEG_ROOT}/libavformat/libavformat.a"
-      "${SM_FFMPEG_ROOT}/libavcodec/libavcodec.a"
-      "${SM_FFMPEG_ROOT}/libswscale/libswscale.a"
-      "${SM_FFMPEG_ROOT}/libavutil/libavutil.a"
+      "${SM_FFMPEG_LIB}/libavformat.a"
+      "${SM_FFMPEG_LIB}/libavcodec.a"
+      "${SM_FFMPEG_LIB}/libswscale.a"
+      "${SM_FFMPEG_LIB}/libavutil.a"
+      ${MAC_FRAME_COREMEDIA}
+      ${MAC_FRAME_COREVIDEO}
+      ${MAC_FRAME_VIDEOTOOLBOX}
+      ${MAC_FRAME_SECURITY}
+      "z"
+      "iconv"
     )
   endif()
 
@@ -735,3 +746,9 @@ if(NOT APPLE)
   endif()
 endif()
 
+
+# Python23IO packs ints into uint8_t initializer lists; older compilers allowed it.
+if(APPLE)
+  set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/io/Python23IO.cpp"
+    PROPERTIES COMPILE_OPTIONS "-Wno-c++11-narrowing")
+endif()

@@ -7,6 +7,8 @@
 #import <Cocoa/Cocoa.h>
 #include "ProductInfo.h"
 #include "arch/ArchHooks/ArchHooks.h"
+#include "StepMania.h"
+#include "PrefsManager.h"
 
 @interface NSApplication (PrivateShutUpWarning)
 - (void) setAppleMenu:(NSMenu *)menu;
@@ -23,14 +25,47 @@
 @implementation SMApplication
 - (void)fullscreen:(id)sender
 {
-	// don't use ArchHooks::SetToggleWindowed(), it makes the screen black
-	[[self mainWindow] toggleFullScreen:nil];
+	/* Use the game's own windowed/fullscreen toggle (flips the Windowed
+	 * preference and re-applies graphics options on the game thread), so the
+	 * shortcut, the options menu and Preferences.ini all agree. Fullscreen is a
+	 * borderless screen-sized window (LowLevelWindow_MacOSX), not macOS's
+	 * native full screen Space. */
+	ArchHooks::SetToggleWindowed();
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)item
+{
+	if( [item action] == @selector(fullscreen:) )
+	{
+		bool bWindowed = PREFSMAN == NULL || PREFSMAN->m_bWindowed;
+		[item setTitle:bWindowed ? NSLocalizedString( @"Enter Full Screen", @"Menu item" )
+					 : NSLocalizedString( @"Exit Full Screen", @"Menu item" )];
+		return YES;
+	}
+	return [super validateMenuItem:item];
 }
 
 - (void)sendEvent:(NSEvent *)event
 {
-	if( [event type] == NSKeyDown )
+	if( [event type] == NSEventTypeKeyDown )
+	{
+		/* Option-Enter is a second shortcut for the full screen item (the menu
+		 * item itself shows ctrl-cmd-F; an NSMenuItem holds only one). Ignore key
+		 * repeat so holding the keys doesn't flip back and forth. */
+		NSEventModifierFlags mods = [event modifierFlags] & NSEventModifierFlagDeviceIndependentFlagsMask;
+		NSString *chars = [event charactersIgnoringModifiers];
+		bool bReturn = [chars length] == 1 &&
+			( [chars characterAtIndex:0] == '\r' || [chars characterAtIndex:0] == 3 /* keypad enter */ );
+		if( bReturn && (mods & ~NSEventModifierFlagNumericPad) == NSEventModifierFlagOption )
+		{
+			if( ![event isARepeat] )
+				[self fullscreen:nil];
+			return;
+		}
+		if( [event isARepeat] && ( mods & NSEventModifierFlagCommand ) && ( mods & NSEventModifierFlagControl ) )
+			return;
 		[[self mainMenu] performKeyEquivalent:event];
+	}
 	else
 		[super sendEvent:event];
 }
@@ -55,7 +90,7 @@
 
 - (id) initWithArgc:(int)argc argv:(char **)argv
 {
-	[super init];
+	self = [super init];
 	if( argc == 2 && !strncmp(argv[1], "-psn_", 5) )
 		argc = 1;
 	m_iArgc = argc;
@@ -156,6 +191,10 @@ static NSMenuItem *MenuItem( NSString *title, SEL action, NSString *code )
 
 static void SetupMenus( void )
 {
+	/* Stop AppKit from adding its own "Enter Full Screen" item (native full
+	 * screen Space, also on ctrl-cmd-F); ours below uses the game's toggle. */
+	[[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"NSFullScreenMenuItemEverywhere"];
+
 	// Get the localized strings from the file.
 	NSString *sWindow =          NSLocalizedString( @"Window",                @"Menu title" );
 	NSString *sHideOthers =      NSLocalizedString( @"Hide Others",           @"Menu item" );
@@ -171,7 +210,7 @@ static void SetupMenus( void )
 	NSMenu *windowMenu = [[[NSMenu alloc] initWithTitle:sWindow] autorelease];
 	NSMenuItem *hideOthers = MenuItem( sHideOthers, @selector(hideOtherApplications:), @"h" );
 
-	[hideOthers setKeyEquivalentModifierMask:NSAlternateKeyMask | NSCommandKeyMask ];
+	[hideOthers setKeyEquivalentModifierMask:NSEventModifierFlagOption | NSEventModifierFlagCommand ];
 
 	[appMenu addItem:MenuItem( sAbout, @selector(orderFrontStandardAboutPanel:), @"" )];
 	[appMenu addItem:[NSMenuItem separatorItem]];
@@ -184,14 +223,15 @@ static void SetupMenus( void )
 	[windowMenu addItem:MenuItem( sMinimize, @selector(performMiniaturize:), @"m" )];
 	[windowMenu addItem:[NSMenuItem separatorItem]];
 
-	// Add a Full Screen item.
-	NSMenuItem *item = MenuItem( sEnterFullScreen, @selector(fullscreen:), @"\n" );
+	// Add a Full Screen item: ctrl-cmd-F, the standard macOS shortcut
+	// (opt-enter also works; see -[SMApplication sendEvent:]).
+	NSMenuItem *item = MenuItem( sEnterFullScreen, @selector(fullscreen:), @"f" );
 
-	[item setKeyEquivalentModifierMask:NSAlternateKeyMask]; // opt-enter
+	[item setKeyEquivalentModifierMask:NSEventModifierFlagControl | NSEventModifierFlagCommand];
 	[windowMenu addItem:item];
 
-	[[mainMenu addItemWithTitle:[appMenu title] action:NULL keyEquivalent:@""] setSubmenu:appMenu];
-	[[mainMenu addItemWithTitle:[windowMenu title] action:NULL keyEquivalent:@""] setSubmenu:windowMenu];
+	[[mainMenu addItemWithTitle:[appMenu title] action:nil keyEquivalent:@""] setSubmenu:appMenu];
+	[[mainMenu addItemWithTitle:[windowMenu title] action:nil keyEquivalent:@""] setSubmenu:windowMenu];
 
 	[NSApp setMainMenu:mainMenu];
 	[NSApp setAppleMenu:appMenu]; // This isn't the apple menu, but it doesn't work without this.

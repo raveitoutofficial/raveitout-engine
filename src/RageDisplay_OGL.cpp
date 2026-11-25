@@ -1,6 +1,7 @@
 #include "global.h"
 
 #include "RageDisplay_OGL.h"
+#include "RageTimer.h"
 #include "RageDisplay_OGL_Helpers.h"
 using namespace RageDisplay_Legacy_Helpers;
 
@@ -873,9 +874,13 @@ void RageDisplay_Legacy::EndFrame()
 		CameraPopMatrix();
 	}
 
+	static RageTimer s_AfterSwap;
+	RageDisplay::NoteFrameWork( s_AfterSwap.PeekDeltaTime(), g_pWind->GetActualVideoModeParams().rate );
+
 	FrameLimitBeforeVsync( g_pWind->GetActualVideoModeParams().rate );
 	g_pWind->SwapBuffers();
 	FrameLimitAfterVsync();
+	s_AfterSwap.Touch();
 
 	// Some would advise against glFinish(), ever. Those people don't realize
 	// the degree of freedom GL hosts are permitted in queueing commands.
@@ -886,7 +891,15 @@ void RageDisplay_Legacy::EndFrame()
 	// glFinish() blocks. We WANT to block. Why? This puts the engine state
 	// reflected by the next frame as close as possible to the on-screen
 	// appearance of that frame.
+#if !defined(MACOSX)
 	glFinish();
+#else
+	/* macOS: OpenGL runs on Metal, where glFinish() also waits for the window
+	 * compositor to take the frame. At 120 Hz that round trip often misses the
+	 * 8.3 ms refresh during gameplay, so frames alternate 8/17 ms and notes
+	 * jitter. CGLFlushDrawable (SwapBuffers) already paces to the refresh, so
+	 * skip the extra full stop and let the CPU prepare the next frame. */
+#endif
 
 	g_pWind->Update();
 

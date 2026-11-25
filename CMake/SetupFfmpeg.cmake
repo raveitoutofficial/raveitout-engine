@@ -1,3 +1,44 @@
+# macOS: FFmpeg 5.1 (64-bit / arm64), configured like upstream stepmania 5_1-new.
+if(MACOSX)
+  set(SM_FFMPEG_SRC_DIR "${SM_EXTERN_DIR}/ffmpeg-5.1")
+  set(FFMPEG_CONFIGURE
+    "${SM_FFMPEG_SRC_DIR}/configure"
+    "--disable-autodetect" "--disable-avdevice" "--disable-avfilter"
+    "--disable-devices" "--disable-doc" "--disable-filters" "--disable-lzma"
+    "--disable-network" "--disable-postproc" "--disable-programs"
+    "--disable-swresample" "--disable-vaapi" "--disable-bzlib"
+    "--enable-pthreads" "--enable-static" "--enable-zlib" "--prefix=/"
+    "--enable-cross-compile" "--enable-videotoolbox"
+    "--extra-cflags=-mmacosx-version-min=11")
+  if(CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+    list(APPEND FFMPEG_CONFIGURE "--arch=arm64" "--extra-cflags=-arch arm64" "--extra-ldflags=-arch arm64")
+  elseif(CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64")
+    list(APPEND FFMPEG_CONFIGURE "--arch=x86_64" "--extra-cflags=-arch x86_64" "--extra-ldflags=-arch x86_64")
+  else()
+    message(FATAL_ERROR "Unsupported macOS architecture: ${CMAKE_OSX_ARCHITECTURES}")
+  endif()
+  if(NOT WITH_EXTERNAL_WARNINGS)
+    list(APPEND FFMPEG_CONFIGURE "--extra-cflags=-w")
+  endif()
+  set(SM_FFMPEG_MAKE $(MAKE))
+  if(WITH_FFMPEG_JOBS GREATER 0)
+    list(APPEND SM_FFMPEG_MAKE "-j${WITH_FFMPEG_JOBS}")
+  endif()
+  list(APPEND SM_FFMPEG_MAKE "&&" "make" "DESTDIR=./dest" "install")
+  externalproject_add("ffmpeg"
+    SOURCE_DIR "${SM_FFMPEG_SRC_DIR}"
+    CONFIGURE_COMMAND ${FFMPEG_CONFIGURE}
+    BUILD_COMMAND "${SM_FFMPEG_MAKE}"
+    UPDATE_COMMAND "" INSTALL_COMMAND "" TEST_COMMAND "")
+  externalproject_get_property("ffmpeg" BINARY_DIR)
+  set(SM_FFMPEG_ROOT "${BINARY_DIR}")
+  set(SM_FFMPEG_LIB "${BINARY_DIR}/dest/lib")
+  set(SM_FFMPEG_INCLUDE "${BINARY_DIR}/dest/include")
+  # The shared include list adds SM_FFMPEG_SRC_DIR; point it at the installed headers.
+  set(SM_FFMPEG_SRC_DIR "${SM_FFMPEG_INCLUDE}")
+  return()
+endif()
+
 set(SM_FFMPEG_VERSION "2.1.3")
 set(SM_FFMPEG_SRC_LIST "${SM_EXTERN_DIR}" "/ffmpeg-linux-" "${SM_FFMPEG_VERSION}")
 sm_join("${SM_FFMPEG_SRC_LIST}" "" SM_FFMPEG_SRC_DIR)
