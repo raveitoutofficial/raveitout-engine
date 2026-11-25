@@ -217,7 +217,11 @@ GameState::~GameState()
 
 	SAFE_DELETE( m_Environment );
 	SAFE_DELETE( g_pImpl );
-	SAFE_DELETE( processedTiming );
+	/* processedTiming only points at the current Steps' TimingData (see
+	 * SetProcessedTimingData callers); GameState doesn't own it. Deleting it
+	 * here crashed on quit during gameplay ("pointer being freed was not
+	 * allocated"). */
+	processedTiming = nullptr;
 
 #if !defined(WITHOUT_NETWORKING)
 	m_SongBroadcastHTTP->GetThreadedResult(); //waits for last call to finish or timeout before destroying object
