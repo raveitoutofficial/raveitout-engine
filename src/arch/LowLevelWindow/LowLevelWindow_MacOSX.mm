@@ -5,6 +5,7 @@
 #import "RageThreads.h"
 #import "RageDisplay_OGL_Helpers.h"
 #import "arch/ArchHooks/ArchHooks.h"
+#import "PrefsManager.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -256,12 +257,13 @@ static NSOpenGLContext *CreateOGLContext( GLContextType type, int iColorSize, in
 		NSOpenGLPFAColorSize, NSOpenGLPixelFormatAttribute(iColorSize),
 		NSOpenGLPFAAlphaSize, NSOpenGLPixelFormatAttribute(iAlphaSize),
 		NSOpenGLPFADepthSize, NSOpenGLPixelFormatAttribute(iDepthSize),
-/*
-		NSOpenGLPFAMultisample,
-		NSOpenGLPFASampleBuffers, (NSOpenGLPixelFormatAttribute)1,
-		NSOpenGLPFASamples, (NSOpenGLPixelFormatAttribute)4,
-*/
 		NSOpenGLPixelFormatAttribute(0), // 9
+		NSOpenGLPixelFormatAttribute(0), // 10
+		NSOpenGLPixelFormatAttribute(0), // 11
+		NSOpenGLPixelFormatAttribute(0), // 12
+		NSOpenGLPixelFormatAttribute(0), // 13
+		NSOpenGLPixelFormatAttribute(0), // 14
+		NSOpenGLPixelFormatAttribute(0), // 15
 		NSOpenGLPixelFormatAttribute(0), // 10
 		NSOpenGLPixelFormatAttribute(0), // 11
 		NSOpenGLPixelFormatAttribute(0), // 12
@@ -287,7 +289,27 @@ static NSOpenGLContext *CreateOGLContext( GLContextType type, int iColorSize, in
 		break;
 	}
 
-	NSOpenGLPixelFormat *pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+	/* Anti-aliasing (MSAA) for the window: smooths the edges of 3D models and
+	 * rotated/scaled geometry. MSAASamples preference: 0 = off, 2, 4, 8.
+	 * If the GPU refuses it, fall back to a plain pixel format. */
+	int iSamples = PREFSMAN ? PREFSMAN->m_iMSAASamples.Get() : 0;
+	if( type != WINDOWED )
+		iSamples = 0;
+	NSOpenGLPixelFormat *pixelFormat = nil;
+	if( iSamples > 1 )
+	{
+		int i = 0;
+		while( attrs[i] != 0 ) ++i;	// first free slot after the type-specific attributes
+		attrs[i+0] = NSOpenGLPFAMultisample;
+		attrs[i+1] = NSOpenGLPFASampleBuffers;
+		attrs[i+2] = NSOpenGLPixelFormatAttribute(1);
+		attrs[i+3] = NSOpenGLPFASamples;
+		attrs[i+4] = NSOpenGLPixelFormatAttribute(iSamples);
+		pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+		attrs[i+0] = attrs[i+1] = attrs[i+2] = attrs[i+3] = attrs[i+4] = 0;
+	}
+	if( !pixelFormat )
+		pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
 
 	if( !pixelFormat )
 		return nil;

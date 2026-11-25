@@ -280,6 +280,7 @@ public:
 	Preference<RString>	m_sLastSeenVideoDriver;
 	Preference<RString>	m_sVideoRenderers; // StepMania.cpp sets these on first run based on the card
 	Preference<bool>	m_bSmoothLines;
+	Preference<int>		m_iMSAASamples;	// anti-aliasing: 0 = off, 2, 4 (default), 8
 	Preference<int>	m_iSoundWriteAhead;
 	Preference<RString>	m_iSoundDevice;	
 	Preference<int> m_iRageSoundSampleCountClamp;
