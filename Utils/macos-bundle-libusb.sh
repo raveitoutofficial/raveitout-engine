@@ -2,6 +2,7 @@
 # Bundle libusb into StepMania.app so it runs without Homebrew.
 #
 #   Utils/macos-bundle-libusb.sh [path/to/StepMania.app]
+#   Utils/macos-bundle-libusb.sh --build-only   (just build; prints the prefix)
 #
 # The PIUIO driver links libusb-compat (libusb 0.1 API), which in turn needs
 # libusb 1.0. Homebrew's bottles are built for the newest macOS only, so this
@@ -16,6 +17,8 @@
 set -euo pipefail
 
 SM_DIR=${0:A:h:h}
+BUILD_ONLY=0
+if [[ ${1:-} == --build-only ]]; then BUILD_ONLY=1; shift; fi
 APP=${1:-$SM_DIR/StepMania.app}
 EXE=$APP/Contents/MacOS/StepMania
 FW=$APP/Contents/Frameworks
@@ -54,9 +57,14 @@ build_libs() {
       --disable-static --disable-dependency-tracking >/dev/null
     make -j"$jobs" >/dev/null && make install >/dev/null )
 
-  # Find only our libusb-1.0, never Homebrew's.
+  # Use only our libusb-1.0, never Homebrew's. With the _CFLAGS/_LIBS
+  # variables set, configure never actually queries pkg-config; it only
+  # checks one exists, so stand in /usr/bin/true when it isn't installed.
+  local pkgconf; pkgconf=$(command -v pkg-config || echo /usr/bin/true)
   ( cd "$WORK/src/libusb-compat-$COMPAT_VER"
+    PKG_CONFIG=$pkgconf \
     PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig PKG_CONFIG_PATH= \
+    LIBUSB_1_0_CFLAGS="-I$PREFIX/include/libusb-1.0" LIBUSB_1_0_LIBS="-L$PREFIX/lib -lusb-1.0" \
     CFLAGS=$flags LDFLAGS=$flags ./configure --prefix="$PREFIX" \
       --disable-static --disable-dependency-tracking >/dev/null
     make -j"$jobs" >/dev/null && make install >/dev/null )
@@ -66,8 +74,9 @@ build_libs() {
   cp "$WORK/src/libusb-compat-$COMPAT_VER/COPYING" "$PREFIX/licenses/libusb-compat-$COMPAT_VER-COPYING.txt"
 }
 
-[[ -x $EXE ]] || { echo "no executable at $EXE" >&2; exit 1; }
 [[ -f $PREFIX/lib/libusb-0.1.4.dylib && -f $PREFIX/lib/libusb-1.0.0.dylib ]] || build_libs
+if (( BUILD_ONLY )); then echo "$PREFIX"; exit 0; fi
+[[ -x $EXE ]] || { echo "no executable at $EXE" >&2; exit 1; }
 
 # Whatever libusb-0.1 the linker picked up (Homebrew, /usr/local, ...).
 OLD=$(otool -L "$EXE" | awk '/libusb-0\.1\.4\.dylib/ && $1 !~ /^@/ {print $1}')

@@ -1,3 +1,63 @@
+Rave It Out engine
+==================
+
+This is the engine for **Rave It Out**, with a native Apple Silicon port. It's based
+on StepAMWorks (below), a fork of StepMania. The Rave It Out theme and noteskins are
+included. No songs are included; put your own in the `Songs` folder.
+
+## Build it yourself on a Mac (Apple Silicon)
+
+You don't need any programming experience for this. It takes about 15-30 minutes,
+and most of that is waiting.
+
+**You need:** a Mac with an M1 chip or newer, about 3 GB of free space, and an
+internet connection. Homebrew is *not* needed.
+
+1. **Open Terminal.** Press `Command + Space`, type `Terminal`, and press Return.
+
+2. **Install Apple's Command Line Tools** (skip this if you already have them).
+   Copy this line into Terminal and press Return:
+
+   ```bash
+   xcode-select --install
+   ```
+
+   Click **Install** in the window that pops up and wait for it to finish. If it says
+   the tools are already installed, that's fine; go to the next step.
+
+3. **Download the code.** Copy this into Terminal and press Return:
+
+   ```bash
+   cd ~/Desktop && git clone --depth 1 --branch arm64-macos https://github.com/raveitoutofficial/raveitout-engine.git
+   ```
+
+   This makes a `raveitout-engine` folder on your Desktop.
+
+4. **Build it.** Copy this into Terminal and press Return:
+
+   ```bash
+   cd ~/Desktop/raveitout-engine && ./build-mac.sh
+   ```
+
+   The script downloads what it needs (CMake, FFmpeg's source and libusb, each from
+   its official site, with checksums verified) and compiles everything. Leave
+   Terminal open until it says **Done!** If something goes wrong, it tells you what
+   happened and where the log file is.
+
+5. **Play.** Open the `raveitout-engine` folder on your Desktop and double-click
+   **StepMania.app**. Put your songs in the `Songs` folder in that same folder.
+   Your scores and settings are saved in the `Save` folder there too.
+
+   If macOS asks for **Input Monitoring** permission, allow it. Keyboards and dance
+   pads need it.
+
+**To update later:** run `cd ~/Desktop/raveitout-engine && git pull && ./build-mac.sh`.
+Updates are much quicker than the first build.
+
+---
+
+The original StepAMWorks readme follows.
+
 StepAMWorks
 =========
 
