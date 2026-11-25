@@ -61,7 +61,8 @@ function Setup()
 	PREFSMAN:SetPreference("DelayedBack",false);	--not verified
 	PREFSMAN:SetPreference("MusicWheelSwitchSpeed",15);
 			--Appearance Options
-	PREFSMAN:SetPreference("DefaultModifiers","rio,2x");
+	PREFSMAN:SetPreference("DefaultModifiers","m300,rio-3d");	-- default for everyone: AV 300 + lit 3D rio noteskin (2026-11-25).
+	-- A player's own speed/noteskin saved in their profile still overrides this when the profile loads.
 	PREFSMAN:SetPreference("Announcer",nil); 		--not verified
 	PREFSMAN:SetPreference("PercentageScoring",true);	--doesn't work?
 	PREFSMAN:SetPreference("RandomBackgroundMode","RandomBackgroundMode_RandomMovies");
