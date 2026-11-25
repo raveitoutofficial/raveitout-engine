@@ -128,5 +128,8 @@ function Setup()
 	MUSICWHEEL_SONG_NAMES = (ReadPrefFromFile("ShowSongNames") == "true");
 	
 	--Just in case? There's probably no need to make this global.
-	USING_RFID = (ReadPrefFromFile("SaveType") == "RFID");
+	USING_RFID = (ReadPrefFromFile("SaveType") == "RFID") and CardReaderAvailable();
+	if ReadPrefFromFile("SaveType") == "RFID" and not USING_RFID then
+		Trace("SaveType is RFID but no card reader port is set (CardReaderPortP1/P2); using normal profiles.");
+	end;
 end

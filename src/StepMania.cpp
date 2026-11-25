@@ -30,7 +30,7 @@
 #include "RageSurface.h"
 #include "RageSurface_Load.h"
 #include "CommandLineActions.h"
-#include "arch/CardReader/CardReader_Arduino.h"
+#include "arch/CardReader/CardReader.h"
 
 #if !defined(SUPPORT_OPENGL) && !defined(SUPPORT_D3D)
 #define SUPPORT_OPENGL
@@ -298,6 +298,7 @@ void ShutdownGame()
 
 	SAFE_DELETE( SCREENMAN );
 	SAFE_DELETE( STATSMAN );
+	SAFE_DELETE( CARDREADER ); // stop reader threads before MESSAGEMAN goes away
 	SAFE_DELETE( MESSAGEMAN );
 	SAFE_DELETE( NSMAN );
 	/* Delete INPUTMAN before the other INPUTFILTER handlers, or an input
@@ -1186,7 +1187,7 @@ int sm_main(int argc, char* argv[])
 	if( PREFSMAN->m_bSignProfileData )
 		CRYPTMAN->GenerateGlobalKeys();
 	MEMCARDMAN	= new MemoryCardManager;
-	//CARDREADER = new CardReader_Arduino;
+	CARDREADER	= new CardReaderManager;	// does nothing unless CardReaderPortP1/P2 is set
 	CHARMAN		= new CharacterManager;
 	PROFILEMAN	= new ProfileManager;
 	PROFILEMAN->Init();				// must load after SONGMAN

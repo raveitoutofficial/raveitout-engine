@@ -19,6 +19,8 @@ local function inputs(event)
 end;
 
 return Def.ActorFrame{
+	-- Only exists in card mode (see CardReaderAvailable in Scripts/06 MemcardHelpers.lua).
+	Condition=(USING_RFID == true);
 	
 	--[[OnCommand=function(self)
 		SCREENMAN:GetTopScreen():AddInputCallback(inputs);
@@ -44,6 +46,7 @@ return Def.ActorFrame{
 	Def.Quad{
 		InitCommand=cmd(setsize,SCREEN_WIDTH,SCREEN_HEIGHT;diffuse,Color("Black");diffusealpha,0);
 		CardScannedMessageCommand=function(self,params)
+			if not USING_RFID then return end;
 			LAST_SCANNED_CARD = params
 			--SOUND
 			GAMESTATE:JoinPlayer(params.Player):ApplyGameCommand("applydefaultoptions",params.Player);

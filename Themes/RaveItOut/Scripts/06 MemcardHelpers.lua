@@ -1,4 +1,13 @@
 -- Memory card helpers
+
+-- Card reader (RFID) login is only on when BOTH are set:
+--   1. the engine has a reader port (CardReaderPortP1 and/or CardReaderPortP2
+--      in Save/Preferences.ini), and
+--   2. Options > SAVE TYPE is "USB and RFID" (theme pref SaveType=RFID).
+-- Otherwise the theme behaves as if card readers didn't exist.
+function CardReaderAvailable()
+	return CARDREADER ~= nil and CARDREADER:IsEnabled()
+end;
 function IsMemcardEnabled()
 	return PREFSMAN:GetPreference("MemoryCards") and PREFSMAN:GetPreference("MemoryCardProfiles")
 end;

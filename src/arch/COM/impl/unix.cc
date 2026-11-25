@@ -168,8 +168,13 @@ Serial::SerialImpl::open ()
   static serial::Timeout serial_timeout_baud(4294967295,0,10,0,100);
   setTimeout(serial_timeout_baud);
   reconfigurePort();
-  setDTR (dtr_);
-  
+  // Not every port supports DTR (virtual/pty ports return ENOTTY); that
+  // shouldn't stop the port from opening.
+  try {
+    setDTR (dtr_);
+  } catch (SerialException &) {
+  }
+
 }
 
 void

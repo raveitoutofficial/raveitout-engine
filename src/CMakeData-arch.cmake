@@ -48,10 +48,13 @@ source_group("Arch Specific\\\\COM" FILES ${SMDATA_ARCH_COM_SRC} ${SMDATA_ARCH_C
 
 list(APPEND SMDATA_ARCH_ACIO_SRC
   "arch/ACIO/ACIO.cpp"
+  # Serial card reader (all platforms; dormant unless CardReaderPortP1/P2 is set).
+  "arch/CardReader/CardReader.cpp"
 )
 
 list(APPEND SMDATA_ARCH_ACIO_HPP
   "arch/ACIO/ACIO.h"
+  "arch/CardReader/CardReader.h"
 )
 
 source_group("Arch Specific\\\\ACIO" FILES ${SMDATA_ARCH_ACIO_SRC} ${SMDATA_ARCH_ACIO_HPP})
@@ -471,8 +474,6 @@ else() # Unix/Linux
       "arch/InputHandler/InputHandler_Linux_PIUIO.cpp"
       "arch/InputHandler/InputHandler_SextetStream.cpp"
       #"arch/InputHandler/InputHandler_MK3.cpp"
-      #Yeah I know it's not really input but I'm not gonna make yet another cmake thing for it ok
-      "arch/CardReader/CardReader_Arduino.cpp"
     )
     list(APPEND SMDATA_ARCH_INPUT_SRC
       "arch/InputHandler/LinuxInputManager.h"
@@ -481,7 +482,6 @@ else() # Unix/Linux
       "arch/InputHandler/InputHandler_Linux_PIUIO.h"
       "arch/InputHandler/InputHandler_SextetStream.h"
       #"arch/InputHandler/InputHandler_MK3.h"
-      "arch/CardReader/CardReader_Arduino.h"
     )
     if(WITH_TTY)
       list(APPEND SMDATA_ARCH_INPUT_SRC

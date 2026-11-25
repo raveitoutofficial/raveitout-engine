@@ -21,7 +21,7 @@
 #include "NetworkSyncManager.h"
 #include "RageTimer.h"
 #include "RageInput.h"
-#include "arch/CardReader/CardReader_Arduino.h"
+#include "arch/CardReader/CardReader.h"
 
 static RageTimer g_GameplayTimer;
 
@@ -285,7 +285,8 @@ void GameLoop::UpdateAllButDraw(bool bRunningFromVBLANK)
 	GAMESTATE->Update(fDeltaTime);
 	SCREENMAN->Update(fDeltaTime);
 	MEMCARDMAN->Update();
-	//CARDREADER->Update();
+	if( CARDREADER )
+		CARDREADER->Update();
 	NSMAN->Update(fDeltaTime);
 
 	/* Important: Process input AFTER updating game logic, or input will be

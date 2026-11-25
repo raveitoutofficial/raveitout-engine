@@ -44,16 +44,50 @@ Alternatively you can run `od --endian=big -x < /dev/ttyUSB0` where ttyUSB0 is t
 Coming soon...
 
 ## Configuration in StepMania
-TODO...
 
-You must implement card reader support in YOUR THEME. The card reader will only trigger CardScannedMessageCommand with params `{player=PlayerNumber,card=cardid}`. PlayerNumber = PlayerNumber enum, cardid = string.
+Card login is **off by default** and stays completely dormant (no thread, no
+port opened) until you turn it on in two places:
 
-That means you can hide local profiles and create local profiles based on the scanned card, or whatever else you want really. This is mostly for Rave It Out after all, you gotta do it yourself if you want something else.
+1. **Engine:** in `Save/Preferences.ini`, set the serial port of each reader:
 
-Use `PROFILEMAN:CreateLocalProfileByID(String name,String id)` to create profiles.
+   ```
+   CardReaderPortP1=/dev/cu.usbmodem14101
+   CardReaderPortP2=
+   CardReaderBaud=9600
+   ```
 
-If you want a complete example, start from here:
+   - macOS: `/dev/cu.usbmodem...` or `/dev/cu.usbserial...` (use `cu.`, not `tty.`)
+   - Windows: `COM3` etc. (Device Manager > Ports)
+   - Linux: `/dev/ttyACM0` or `/dev/ttyUSB0`
 
-https://github.com/RhythmLunatic/raveitout/blob/master/Graphics/ScreenAttract%20cardInserted.lua
+   P1 and P2 each get their own reader, so the game knows which side was
+   tapped. Leave one empty for a single reader. If a port can't be opened,
+   `Logs/log.txt` lists the serial ports it found; the game keeps retrying, so
+   readers can be plugged in after it starts.
 
-https://github.com/RhythmLunatic/raveitout/blob/master/BGAnimations/ScreenSelectProfile%20overlay/default.lua#L813-L866
+2. **Theme:** Options > SAVE TYPE > "USB and RFID".
+
+Both are needed. With only one set, the game uses normal profiles.
+
+### What the engine sends the theme
+
+Each valid scan broadcasts `CardScanned` with
+`{ Player = PlayerNumber, card = "DEADBEEF00000000" }`: the 8 ID bytes as 16
+uppercase hex digits. Packets with a bad checksum are dropped, and the same
+card held on the same reader is ignored for 3 seconds. `CARDREADER:IsEnabled()`
+(optionally with a PlayerNumber) tells Lua whether any reader is configured.
+
+### What the Rave It Out theme does with it
+
+- On ScreenSelectProfile: a known card selects its profile; a new card creates
+  a profile called "New Player" whose ID (folder in `Save/LocalProfiles/`) is
+  the card ID.
+- During the attract demo: a scan starts a session and goes to profile select.
+- See `CardReaderAvailable()` in `Themes/RaveItOut/Scripts/06 MemcardHelpers.lua`.
+
+### Testing without hardware
+
+Any program that writes the 11-byte packet (`AA AA`, 8 ID bytes, then
+`~(sum of the previous 10 bytes)`) to a serial port works. On macOS/Linux a
+pseudo-terminal (Python `os.openpty()`) can stand in for the reader: point
+`CardReaderPortP1` at the pty's path.

@@ -853,7 +853,7 @@ local t = Def.ActorFrame {
 	end;
 
 	OnCommand=function(self, params)
-		if LAST_SCANNED_CARD ~= nil then
+		if USING_RFID and LAST_SCANNED_CARD ~= nil then
 			self:playcommand("CheckingCard");
 		end;
 		self:queuecommand('UpdateInternal2');
@@ -877,9 +877,10 @@ local t = Def.ActorFrame {
 	CheckingCardCommand=function(self)
 		assert(LAST_SCANNED_CARD.card);
 		assert(LAST_SCANNED_CARD.Player)
+		-- GetLocalProfileIndexFromID: 0-based, -1 if missing. SetProfileIndex: 1-based (0 = USB card).
 		local ind = PROFILEMAN:GetLocalProfileIndexFromID(LAST_SCANNED_CARD.card);
 		assert(ind);
-		if ind > 0 then
+		if ind >= 0 then
 			SCREENMAN:GetTopScreen():SetProfileIndex(LAST_SCANNED_CARD.Player, ind+1 );
 			curProfileScreen[LAST_SCANNED_CARD.Player] = 1;
 			self:sleep(.3):queuecommand("UpdateInternal2");
@@ -889,8 +890,8 @@ local t = Def.ActorFrame {
 			--It would make more sense to just give the ID when it's created right?
 			if PROFILEMAN:CreateLocalProfileByID("New Player", LAST_SCANNED_CARD.card) then
 				local ind = PROFILEMAN:GetLocalProfileIndexFromID(LAST_SCANNED_CARD.card);
-				if ind then
-					SCREENMAN:GetTopScreen():SetProfileIndex(LAST_SCANNED_CARD.Player, ind );
+				if ind >= 0 then
+					SCREENMAN:GetTopScreen():SetProfileIndex(LAST_SCANNED_CARD.Player, ind+1 );
 					curProfileScreen[LAST_SCANNED_CARD.Player] = 1;
 					--SCREENMAN:SystemMessage(curProfileScreen[params.PlayerNumber]);
 					self:sleep(.3):queuecommand("UpdateInternal2");
