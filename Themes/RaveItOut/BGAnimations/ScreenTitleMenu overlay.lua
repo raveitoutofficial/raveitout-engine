@@ -42,6 +42,8 @@ return Def.ActorFrame{
 			local aspectRatio = round(GetScreenAspectRatio(),2);
 			if aspectRatio == 1.78 then
 				self:settext("DISPLAY TYPE: HD");
+			elseif aspectRatio == 1.6 then
+				self:settext("DISPLAY TYPE: HD (16:10)");	-- e.g. MacBook screens
 			elseif aspectRatio == 1.33 then
 				self:settext("DISPLAY TYPE: SD");
 			else
