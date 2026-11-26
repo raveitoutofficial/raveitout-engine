@@ -742,7 +742,9 @@ namespace RaveItOut.AudioSync
             if (exe == null) { Status = "Couldn't find the game in " + (GameFolder ?? "?") + "."; Notify(); return false; }
             try
             {
-                Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(exe), UseShellExecute = true });
+                // --theme as well as the prefs: the engine applies it before any per-game Theme override.
+                string args = Display != null ? "--theme=" + Display.Theme : "";
+                Process.Start(new ProcessStartInfo(exe, args) { WorkingDirectory = Path.GetDirectoryName(exe), UseShellExecute = true });
                 RefreshRunning();
                 Notify();
                 return CloseAfterLaunch;

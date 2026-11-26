@@ -50,6 +50,14 @@ static class Tests
         Check(DisplayMode.Read(disp) == DisplayMode.All[2], "Full HD round-trips");
         string dispCopy = Path.Combine(work, "display-real.ini");
         File.Copy(src, dispCopy, true);
+        // setting each display key to the value it already has must give identical bytes
+        string same = File.ReadAllText(src, System.Text.Encoding.GetEncoding(28591));
+        foreach (var k in new[] { "DisplayWidth", "DisplayHeight", "DisplayAspectRatio", "Theme" })
+        {
+            string v = PrefsINI.ReadValue(src, "[Options]", k);
+            if (v != null) same = PrefsINI.SetValue(same, s => s == "[Options]", k, v, false);
+        }
+        Check(System.Text.Encoding.GetEncoding(28591).GetBytes(same).SequenceEqual(before), "rewriting display keys with their values gives identical bytes");
         var was = DisplayMode.Read(dispCopy);
         PrefsINI.WriteDisplay(DisplayMode.All[0], dispCopy);
         Check(DisplayMode.Read(dispCopy) == DisplayMode.All[0], "SD on a copy of the real prefs");
