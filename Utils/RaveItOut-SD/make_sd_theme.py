@@ -59,6 +59,10 @@ FONT_SCALE = [
 # runtime, e.g. GetPathG("FastSlow", j.." 2x1 (doubleres).png").
 IMAGE_KEEP = [r"FastSlow", r"SortOrder", r"avatars", r"ProfileBanner"]
 
+# 16:9 videos whose text/logos reach the edges: letterbox to 4:3 instead of
+# centre-cropping.
+VIDEO_FIT = [r"opening", r"nextstage_"]
+
 # Videos left alone (drawn with a plain zoom, so their pixel size matters).
 VIDEO_KEEP = [r"PlayModeIcons"]
 
@@ -171,14 +175,20 @@ def plan_image(rel, w, h):
     return stem2 + hints + ext, ow, oh, (ow, oh) != (w, h)
 
 
-def encode_video(ffmpeg, src, dst, w, h, fps):
+def encode_video(ffmpeg, src, dst, w, h, fps, fit=False):
     vf = []
-    if w / h > 4 / 3 + 0.02:                  # wider than 4:3: crop centre (what Cover shows)
+    if fit and w / h > 4 / 3 + 0.02:          # letterbox: whole frame, black bars
+        sh = round(SD_W * h / w / 2) * 2
+        vf.append(f"scale={SD_W}:{sh}:flags=lanczos,pad={SD_W}:{SD_H}:0:(oh-ih)/2:black,setsar=1")
+    elif w / h > 4 / 3 + 0.02:                  # wider than 4:3: crop centre (what Cover shows)
         cw = round(h * 4 / 3 / 2) * 2
         vf.append(f"crop={cw}:{h}")
-    vf.append(f"scale={SD_W}:{SD_H}:flags=lanczos,setsar=1")
+    if not vf or not vf[-1].startswith("scale"):
+        vf.append(f"scale={SD_W}:{SD_H}:flags=lanczos,setsar=1")
     cmd = [ffmpeg, "-v", "error", "-y", "-i", src, "-an", "-vf", ",".join(vf),
-           "-c:v", "mpeg2video", "-q:v", "3", "-g", "30", "-bf", "2", "-r", fps, dst]
+           "-c:v", "mpeg2video", "-q:v", "3", "-g", "15", "-bf", "0",
+           "-flags", "+cgop", "-sc_threshold", "1000000000",   # closed GOPs, no B-frames:
+           "-r", fps, dst]                                      # clean loops
     return run(cmd)
 
 
@@ -187,6 +197,7 @@ def main():
     ap.add_argument("--ffmpeg")
     ap.add_argument("--force", action="store_true", help="re-encode everything")
     ap.add_argument("--skip-videos", action="store_true", help="copy videos unchanged")
+    ap.add_argument("--tour", action="store_true", help="install the screenshot tour (testing only)")
     args = ap.parse_args()
 
     ffmpeg = find_ffmpeg(args.ffmpeg)
@@ -240,7 +251,8 @@ def main():
                     w, h, fps = video_info(src, ffprobe)
                     log(f"  video {rel} {w}x{h} -> {SD_W}x{SD_H}")
                     tmp = dst + ".tmp" + ext
-                    if encode_video(ffmpeg, src, tmp, w, h, fps):
+                    if encode_video(ffmpeg, src, tmp, w, h, fps,
+                                    fit=any(re.search(p, rel, re.I) for p in VIDEO_FIT)):
                         os.replace(tmp, dst)
                     else:
                         shutil.copy2(src, dst)
@@ -286,6 +298,22 @@ def main():
                 f.write(new.encode("latin-1"))
             rewritten += 1
 
+    # 4:3 layout patches (patches.py), applied to the fresh copies.
+    sys.path.insert(0, HERE)
+    from patches import PATCHES
+    for rel, old, new in PATCHES:
+        path = os.path.join(DST, rel)
+        with open(path, "rb") as f:
+            text = f.read().decode("latin-1")
+        if "\r\n" in text:
+            old, new = old.replace("\n", "\r\n"), new.replace("\n", "\r\n")
+        if text.count(old) != 1:
+            sys.exit(f"patch for {rel} no longer matches the HD theme "
+                     f"(found {text.count(old)}x); update patches.py")
+        with open(path, "wb") as f:
+            f.write(text.replace(old, new).encode("latin-1"))
+    log(f"applied {len(PATCHES)} layout patches")
+
     # Overlay: hand-made SD files win over generated ones.
     for root, dirs, files in os.walk(OVERLAY):
         for fn in files:
@@ -295,6 +323,17 @@ def main():
             shutil.copy2(src, os.path.join(DST, rel))
             produced.add(os.path.normcase(rel))
 
+    if args.tour:
+        # Wrap the system layer with the screenshot tour (see README). Rerun
+        # without --tour before shipping.
+        bga = os.path.join(DST, "BGAnimations")
+        shutil.copy2(os.path.join(bga, "ScreenSystemLayer overlay.lua"),
+                     os.path.join(bga, "_sdshot_orig.lua"))
+        shutil.copy2(os.path.join(HERE, "screenshot_tour.lua"),
+                     os.path.join(bga, "ScreenSystemLayer overlay.lua"))
+        produced.add(os.path.normcase(os.path.join("BGAnimations", "_sdshot_orig.lua")))
+        log("screenshot tour installed: rerun without --tour before shipping")
+
     # Remove stale outputs (files from older runs whose source is gone/renamed).
     stale = 0
     for root, dirs, files in os.walk(DST, topdown=False):
@@ -302,6 +341,7 @@ def main():
             rel = os.path.normcase(os.path.relpath(os.path.join(root, fn), DST))
             if rel not in produced:
                 os.remove(os.path.join(root, fn))
+                log("  removed stale", rel)
                 stale += 1
         if not os.listdir(root):
             os.rmdir(root)

@@ -39,8 +39,21 @@ or set `Theme=RaveItOut-SD-mipmaps` in `Save/Preferences.ini`.
 * **Videos:** 16:9 videos are centre-cropped to 4:3 (what `Cover()` shows on a 4:3 screen) and
   re-encoded as MPEG-2 640×480 without audio. That is cheaper to decode on the cabinet PC.
   `PlayModeIcons` are drawn with a plain zoom, so they keep their size (`VIDEO_KEEP`).
-* **overlay/** is copied on top last: `ThemeInfo.ini` (SD display name) and any SD-only
-  Lua/metrics fixes for the 4:3 layout.
+  Videos whose text or logo reaches the edges (`VIDEO_FIT`: the intro, "Next Stage") are letterboxed
+  instead of cropped. Encodes use closed GOPs with no B-frames, so loops restart cleanly.
+* **4:3 layout fixes** live in `patches.py` as exact find/replace pairs on the copied Lua. Generation
+  stops if a pair no longer matches the HD theme, so a fix can't silently drop out. Current fixes:
+  the music wheel's side items are pulled in and scaled to 0.7 so covers and titles fit at 640 wide,
+  and the song-group title gets a max width.
+* **overlay/** is copied on top last: `ThemeInfo.ini` (SD display name). Use it for whole SD-only files.
+
+## Checking layouts without playing
+
+`make_sd_theme.py --tour` installs `screenshot_tour.lua`. It drives intro → title → mode select →
+music select → autoplay of the shortest song → evaluation, saving `Screenshots/sdNN_<screen>_*.png`,
+then quits. Run it windowed at 640×480:
+`Program\StepMania.exe --theme=RaveItOut-SD-mipmaps` (back up `Save/Preferences.ini` first if you switch
+to windowed). **Rerun without `--tour` afterwards**: the tour must never ship.
 
 The script prints "unresolved image reference" for references it couldn't map. Check those by hand
 (add an `IMAGE_KEEP` pattern or an overlay file).
