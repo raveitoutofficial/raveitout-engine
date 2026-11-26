@@ -32,9 +32,9 @@ or set `Theme=RaveItOut-SD-mipmaps` in `Save/Preferences.ini`.
   Together with `TrilinearFiltering=1` this is what makes small text clean. Don't rename the folder.
 * **Fonts:** pages are Lanczos-scaled to about the size they are drawn at (`FONT_SCALE`).
   The `(res WxH)` hint keeps the original virtual size, so the font `.ini` metrics and every zoom stay valid.
-* **Images:** `(doubleres)` art is pre-halved with Lanczos (at 480p the engine would halve it
-  at load time with a cheaper filter). Art bigger than the screen in both directions is scaled down to screen size,
-  renamed with `(res WxH)`. Quoted references with an extension are rewritten in the copied Lua.
+* **Images:** art bigger than the screen in both directions is Lanczos-scaled down to screen size and
+  renamed with `(res WxH)`. Non-font `(doubleres)` art keeps its name, because Lua and `.redir` files build
+  those names at runtime. The engine halves it at load, and mipmaps still apply. Quoted references with an extension are rewritten in the copied Lua.
   Files whose names Lua builds at runtime are listed in `IMAGE_KEEP` and left alone.
 * **Videos:** 16:9 videos are centre-cropped to 4:3 (what `Cover()` shows on a 4:3 screen) and
   re-encoded as MPEG-2 640×480 without audio. That is cheaper to decode on the cabinet PC.
