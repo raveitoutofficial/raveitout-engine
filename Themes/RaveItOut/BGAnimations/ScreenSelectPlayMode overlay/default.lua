@@ -322,13 +322,11 @@ t[#t+1] = LoadActor(THEME:GetPathG("","PlayModes/splash/Arcade"))..{
 		WriteGamePrefToFile("DefaultFail","");
 		setenv("StageBreak",true);
 		
-		--I don't really like this but it's the RIO 'style'
+		--RIO's 30% mini note size is now part of DefaultModifiers (99 InitGame.lua),
+		--so demo mode and the options list's Reset get it too. Guests also get the
+		--defaults (AV 300 + rio-3d) instead of a forced 2x + 2D rio.
 		for pn in ivalues(GAMESTATE:GetHumanPlayers()) do
 			GAMESTATE:ApplyGameCommand( "mod,30% mini;", pn );
-			--Because nobody knows how default modifiers works
-			if PROFILEMAN:IsPersistentProfile(pn) == false then
-				GAMESTATE:ApplyGameCommand( "mod,2x,rio;", pn );
-			end;
 		end
 
 		--Don't hardcode the positions of the items.
