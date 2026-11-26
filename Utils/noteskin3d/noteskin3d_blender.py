@@ -96,11 +96,14 @@ for mi, g in enumerate(used):
     mesh_lines += ['"part%d" 0 %d' % (g, mi), str(len(final.vertices))]
     for vt in final.vertices:
         u, w = uv_of(vt.co)
-        mesh_lines.append("0 %.5f %.5f %.5f %.5f %.5f -1" % (vt.co.x, vt.co.y, vt.co.z, u, w))
+        # The engine's 3D models are Y-UP (2D sprites are Y-down), so mirror Y on
+        # export; UVs come from the un-mirrored position, so the art isn't flipped.
+        mesh_lines.append("0 %.5f %.5f %.5f %.5f %.5f -1" % (vt.co.x, -vt.co.y, vt.co.z, u, w))
     mesh_lines.append(str(len(normals)))
-    mesh_lines += ["%.5f %.5f %.5f" % nn for nn in normals]
+    mesh_lines += ["%.5f %.5f %.5f" % (nn[0], -nn[1], nn[2]) for nn in normals]
     mesh_lines.append(str(len(groups[g])))
-    mesh_lines += ["0 %d %d %d %d %d %d 1" % t for t in groups[g]]
+    # Mirroring Y reverses winding; swap two corners to keep faces front-facing.
+    mesh_lines += ["0 %d %d %d %d %d %d 1" % (t[0], t[2], t[1], t[3], t[5], t[4]) for t in groups[g]]
 
 lines = ["// MilkShape 3D ASCII", "", "Frames: 1", "Frame: 1", "",
          "Meshes: %d" % len(used)] + mesh_lines + ["", "Materials: %d" % len(used)]
