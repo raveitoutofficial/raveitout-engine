@@ -816,7 +816,13 @@ RString RageDisplay_Legacy::TryVideoMode( const VideoModeParams &p, bool &bNewDe
 	/* Set vsync the Windows way, if we can.  (What other extensions are there
 	 * to do this, for other archs?) */
 	if( wglewIsSupported("WGL_EXT_swap_control") )
+	{
 		wglSwapIntervalEXT(p.vsync);
+		/* Some drivers (or their control panel overrides) ignore the request;
+		 * log what the driver actually reports, to diagnose tearing. */
+		LOG->Info( "Vsync: requested swap interval %d, driver reports %d (%s)",
+			p.vsync ? 1 : 0, wglGetSwapIntervalEXT(), p.windowed ? "windowed" : "fullscreen" );
+	}
 	else
 		return RString("The WGL_EXT_swap_control extension is not supported on your computer.");
 #endif

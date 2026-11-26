@@ -96,8 +96,20 @@ static unsigned long rng_ansic(unsigned char *buf, unsigned long len,
    #define UNDER_CE
    #define ARM
 #endif
+/* tomcrypt_custom.h defines bare SHA1/SHA256 macros; newer Windows SDKs
+   use those names as struct fields in winnt.h, so hide them meanwhile. */
+#ifdef _MSC_VER
+#pragma push_macro("SHA1")
+#pragma push_macro("SHA256")
+#undef SHA1
+#undef SHA256
+#endif
 #include <windows.h>
 #include <wincrypt.h>
+#ifdef _MSC_VER
+#pragma pop_macro("SHA256")
+#pragma pop_macro("SHA1")
+#endif
 
 static unsigned long rng_win32(unsigned char *buf, unsigned long len, 
                                void (*callback)(void))

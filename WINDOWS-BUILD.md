@@ -1,5 +1,47 @@
 # Windows build: hand-off notes
 
+## Status (2026-11-26, branch `windows-x64`): it builds and runs
+
+First working **Windows x64** build, made and tested on the Lenovo AIO 700-22ISH (Pentium G4400T, Intel
+HD 510, Windows 11 Home). Plays songs with OpenGL and D3D9; `rio-3d` + MSAA 2x holds a locked 60 FPS at
+720p and 640x480 (about 58 FPS at 1080p) on Overcompensate S17 with its 1080p video.
+
+How to build (VS 2022 Build Tools + CMake 4.x):
+
+```
+cmake -S . -B Build/win64 -G "Visual Studio 17 2022" -A x64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake --build Build/win64 --config Release
+```
+
+Not in git (as on the Mac): put **FFmpeg 5.1.6 win64 LGPL shared** (BtbN build
+`ffmpeg-n5.1.6-16-g6e63e49496-win64-lgpl-shared-5.1.zip`, release `autobuild-2025-01-31-12-58`) in
+`extern/ffmpeg-5.1-win64/` (`include`, `lib`, `bin`), and copy its `bin/*.dll` next to `Program/StepMania.exe`.
+
+What changed for x64 / modern MSVC:
+- 64-bit builds use `extern/ffmpeg-5.1-win64` (`SM_WIN_FFMPEG_DIR`) and libusb-win32 1.4.0.2 x64
+  (`extern/libusb/lib/msvc_x64`; `Program/libusb0.dll` is now the x64 DLL). The 32-bit `ddk` libs are 32-bit only.
+- No legacy DirectX SDK needed: D3DX/DxErr replaced (error strings via FormatMessage, screenshots via
+  GetRenderTargetData). **D3D texture handles were pointers truncated to 32 bits (crash) — now a handle table.**
+- C++17 for MSVC, with `_HAS_AUTO_PTR_ETC=1` and `_HAS_STD_BYTE=0`; libmad uses `FPM_64BIT` on x64; tomcrypt's
+  `SHA1`/`SHA256` macros hidden around `windows.h`.
+- x64 fixes: inline asm (`global.cpp`, crash handler), `INT_PTR` dialog procs, `SetClassLongPtr`, MIDI callback
+  `DWORD_PTR`, crash-report addresses; x64 crash backtraces use `RtlVirtualUnwind`.
+- **MSAA on Windows OpenGL** (was macOS-only): `wglChoosePixelFormatARB` with `MSAASamples` (0/2/4/8).
+- Log line `Vsync: requested swap interval N, driver reports M` (diagnoses drivers that ignore vsync).
+- Debug switch: env var `SM_NO_CRASH_HANDLER=1` writes `crash-min.txt` (crash address + stack, look up in
+  `StepMania.map`) instead of using the crash handler.
+
+Lessons from the Lenovo:
+- Update the Intel driver. The 2016 Lenovo driver ignored vsync (tearing) and ran far more frames over budget.
+  Intel's installer refuses OEM-locked drivers; install 31.0.101.2115 via Device Manager > Have Disk.
+- Fork default: all Intel GPUs get `d3d,opengl` + 16-bit textures (`StepMania.cpp`); HD 510 runs OpenGL fine.
+- Anything else drawing on an integrated GPU (Claude app, remote/computer-use tools) badly skews FPS tests.
+
+Not done yet: PIUIO on Windows via libusb-1.0, display presets + CRT safety, an SD (640x480) theme with SD-made
+fonts/assets, `build-windows.ps1`.
+
+---
+
 Written on the Mac on 2026-11-26, for the Claude Code session that builds Rave It Out on the Windows PC.
 This repo (`raveitoutofficial/raveitout-engine`, branch **`arm64-macos`**) is the engine plus the
 RaveItOut theme. The Mac build is native arm64; this is the first **Windows x64** build.

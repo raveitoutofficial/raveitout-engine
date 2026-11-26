@@ -9,6 +9,7 @@
 #include "LocalizedString.h"
 #include "RageDisplay_OGL_Helpers.h"
 #include "RageDisplay_OGL.h"
+#include "PrefsManager.h"
 
 #include <GL/glew.h>
 
@@ -64,6 +65,61 @@ void LowLevelWindow_Win32::GetDisplaySpecs( DisplaySpecs &out ) const
 	GraphicsWindow::GetDisplaySpecs( out );
 }
 
+/* WGL_ARB_pixel_format / WGL_ARB_multisample, for anti-aliasing (MSAA). */
+#define SM_WGL_DRAW_TO_WINDOW_ARB	0x2001
+#define SM_WGL_ACCELERATION_ARB		0x2003
+#define SM_WGL_SUPPORT_OPENGL_ARB	0x2010
+#define SM_WGL_DOUBLE_BUFFER_ARB	0x2011
+#define SM_WGL_PIXEL_TYPE_ARB		0x2013
+#define SM_WGL_COLOR_BITS_ARB		0x2014
+#define SM_WGL_DEPTH_BITS_ARB		0x2022
+#define SM_WGL_FULL_ACCELERATION_ARB	0x2027
+#define SM_WGL_TYPE_RGBA_ARB		0x202B
+#define SM_WGL_SAMPLE_BUFFERS_ARB	0x2041
+#define SM_WGL_SAMPLES_ARB		0x2042
+typedef BOOL (WINAPI *PFN_wglChoosePixelFormatARB)( HDC, const int *, const FLOAT *, UINT, int *, UINT * );
+
+/* wglChoosePixelFormatARB can only be looked up with a GL context current, and a
+ * window's pixel format can be set only once, so look it up through a hidden
+ * throwaway window. Done once; NULL if the driver doesn't offer it. */
+static PFN_wglChoosePixelFormatARB GetChoosePixelFormatARB()
+{
+	static bool bTried = false;
+	static PFN_wglChoosePixelFormatARB pfn = NULL;
+	if( bTried )
+		return pfn;
+	bTried = true;
+
+	HWND hWnd = CreateWindowA( "STATIC", "", WS_POPUP, 0, 0, 16, 16, NULL, NULL, GetModuleHandle(NULL), NULL );
+	if( hWnd == NULL )
+		return NULL;
+	HDC hDC = GetDC( hWnd );
+	PIXELFORMATDESCRIPTOR pfd;
+	ZERO( pfd );
+	pfd.nSize = sizeof(pfd);
+	pfd.nVersion = 1;
+	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER | PFD_SUPPORT_OPENGL;
+	pfd.iPixelType = PFD_TYPE_RGBA;
+	pfd.cColorBits = 24;
+	int iFormat = ChoosePixelFormat( hDC, &pfd );
+	if( iFormat != 0 && SetPixelFormat(hDC, iFormat, &pfd) )
+	{
+		HGLRC hRC = wglCreateContext( hDC );
+		if( hRC != NULL )
+		{
+			HDC hOldDC = wglGetCurrentDC();
+			HGLRC hOldRC = wglGetCurrentContext();
+			if( wglMakeCurrent(hDC, hRC) )
+				pfn = (PFN_wglChoosePixelFormatARB) wglGetProcAddress( "wglChoosePixelFormatARB" );
+			wglMakeCurrent( hOldDC, hOldRC );
+			wglDeleteContext( hRC );
+		}
+	}
+	ReleaseDC( hWnd, hDC );
+	DestroyWindow( hWnd );
+	return pfn;
+}
+
 int ChooseWindowPixelFormat( const VideoModeParams &p, PIXELFORMATDESCRIPTOR *pixfmt )
 {
 	ASSERT( GraphicsWindow::GetHwnd() != NULL );
@@ -76,6 +132,41 @@ int ChooseWindowPixelFormat( const VideoModeParams &p, PIXELFORMATDESCRIPTOR *pi
 	pixfmt->iPixelType		= PFD_TYPE_RGBA;
 	pixfmt->cColorBits		= p.bpp == 16? 16:24;
 	pixfmt->cDepthBits		= 16;
+
+	/* Anti-aliasing (MSAA): smooths the edges of 3D models and rotated/scaled
+	 * geometry. MSAASamples preference: 0 = off, 2, 4, 8. If the driver can't
+	 * give a multisampled format, fall back to the plain one below. */
+	const int iSamples = PREFSMAN ? PREFSMAN->m_iMSAASamples.Get() : 0;
+	if( iSamples > 1 )
+	{
+		PFN_wglChoosePixelFormatARB pChoose = GetChoosePixelFormatARB();
+		if( pChoose != NULL )
+		{
+			const int attribs[] = {
+				SM_WGL_DRAW_TO_WINDOW_ARB, TRUE,
+				SM_WGL_SUPPORT_OPENGL_ARB, TRUE,
+				SM_WGL_DOUBLE_BUFFER_ARB, TRUE,
+				SM_WGL_ACCELERATION_ARB, SM_WGL_FULL_ACCELERATION_ARB,
+				SM_WGL_PIXEL_TYPE_ARB, SM_WGL_TYPE_RGBA_ARB,
+				SM_WGL_COLOR_BITS_ARB, p.bpp == 16? 16:24,
+				SM_WGL_DEPTH_BITS_ARB, 16,
+				SM_WGL_SAMPLE_BUFFERS_ARB, 1,
+				SM_WGL_SAMPLES_ARB, iSamples,
+				0
+			};
+			int iFormat = 0;
+			UINT iNumFormats = 0;
+			if( pChoose(GraphicsWindow::GetHDC(), attribs, NULL, 1, &iFormat, &iNumFormats) && iNumFormats > 0 && iFormat != 0 )
+			{
+				DescribePixelFormat( GraphicsWindow::GetHDC(), iFormat, sizeof(PIXELFORMATDESCRIPTOR), pixfmt );
+				LOG->Info( "MSAA: using %ix multisampled pixel format %i", iSamples, iFormat );
+				return iFormat;
+			}
+			LOG->Warn( "MSAA: driver has no %ix multisampled pixel format; anti-aliasing off", iSamples );
+		}
+		else
+			LOG->Warn( "MSAA: wglChoosePixelFormatARB not available; anti-aliasing off" );
+	}
 
 	return ChoosePixelFormat( GraphicsWindow::GetHDC(), pixfmt );
 }

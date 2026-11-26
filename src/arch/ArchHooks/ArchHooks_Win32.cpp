@@ -24,6 +24,38 @@ void InvalidParameterHandler( const wchar_t *szExpression, const wchar_t *szFunc
 }
 #endif
 
+/* Debug-only crash logger for SM_NO_CRASH_HANDLER: writes the exception and a
+ * stack of addresses relative to StepMania.exe (look them up in StepMania.map)
+ * to crash-min.txt in the working directory. No allocation, no locks. */
+static LONG WINAPI MinimalCrashLog( EXCEPTION_POINTERS *pExc )
+{
+	const void *frames[64];
+	CrashHandler::do_backtrace( frames, 64, GetCurrentProcess(), GetCurrentThread(), pExc->ContextRecord );
+	HANDLE h = CreateFileA( "crash-min.txt", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+	if( h != INVALID_HANDLE_VALUE )
+	{
+		char line[256];
+		DWORD n;
+		const ULONG_PTR base = (ULONG_PTR) GetModuleHandleA( NULL );
+		wsprintfA( line, "code %08lX at %p, exe base %p\r\n", pExc->ExceptionRecord->ExceptionCode,
+			pExc->ExceptionRecord->ExceptionAddress, (void *) base );
+		WriteFile( h, line, lstrlenA(line), &n, NULL );
+		for( int i = 0; i < 64 && frames[i] != NULL; ++i )
+		{
+			HMODULE mod = NULL;
+			char modname[MAX_PATH] = "?";
+			if( GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+				(LPCSTR) frames[i], &mod ) )
+				GetModuleFileNameA( mod, modname, MAX_PATH );
+			wsprintfA( line, "%2d %p rva %08lX %s\r\n", i, frames[i],
+				(unsigned long) ((ULONG_PTR) frames[i] - (ULONG_PTR) mod), modname );
+			WriteFile( h, line, lstrlenA(line), &n, NULL );
+		}
+		CloseHandle( h );
+	}
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
 ArchHooks_Win32::ArchHooks_Win32()
 {
 	HOOKS = this;
@@ -33,7 +65,16 @@ ArchHooks_Win32::ArchHooks_Win32()
 	SetErrorMode( SetErrorMode(0) | SEM_FAILCRITICALERRORS );
 
 	CrashHandler::CrashHandlerHandleArgs( g_argc, g_argv );
-	SetUnhandledExceptionFilter( CrashHandler::ExceptionHandler );
+	/* Debug switch: with SM_NO_CRASH_HANDLER set, leave crashes to Windows
+	 * Error Reporting (Event Viewer, event 1000: faulting module + offset)
+	 * instead of our own handler, and don't show the WER dialog. */
+	if( GetEnvironmentVariableA( "SM_NO_CRASH_HANDLER", NULL, 0 ) != 0 )
+	{
+		SetErrorMode( SetErrorMode(0) | SEM_NOGPFAULTERRORBOX );
+		SetUnhandledExceptionFilter( MinimalCrashLog );
+	}
+	else
+		SetUnhandledExceptionFilter( CrashHandler::ExceptionHandler );
 
 #if _MSC_VER >= 1400 // VC8
 	_set_invalid_parameter_handler( InvalidParameterHandler );

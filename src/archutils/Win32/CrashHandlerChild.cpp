@@ -277,7 +277,7 @@ namespace SymbolLookup
 		return true;
 	}
 
-	SYMBOL_INFO *GetSym( unsigned long ptr, DWORD64 &disp )
+	SYMBOL_INFO *GetSym( DWORD64 ptr, DWORD64 &disp )
 	{
 		InitDbghelp();
 
@@ -356,6 +356,22 @@ namespace SymbolLookup
 		MEMORY_BASIC_INFORMATION meminfo;
 		VirtualQueryEx( g_hParent, ptr, &meminfo, sizeof meminfo );
 
+#if defined(_WIN64)
+		{
+			/* x64: the VDI table and the code below assume 32-bit absolute
+			 * addresses (fixed image base), but x64 images load high and at a
+			 * random base. Print module + offset; look the offset up in
+			 * StepMania.map (Rva+Base minus the preferred load address). */
+			RString sName = CrashChildGetModuleBaseName( (HMODULE)meminfo.AllocationBase );
+			const unsigned long long iOffset = (unsigned long long)(ULONG_PTR) ptr - (unsigned long long)(ULONG_PTR) meminfo.AllocationBase;
+			DWORD64 disp = 0;
+			SYMBOL_INFO *pSymbol = GetSym( (DWORD64)(ULONG_PTR) ptr, disp );
+			if( pSymbol )
+				sprintf( buf, "%p: %s+0x%llx (%s+0x%llx)", ptr, sName.c_str(), iOffset, pSymbol->Name, (unsigned long long) disp );
+			else
+				sprintf( buf, "%p: %s+0x%llx", ptr, sName.c_str(), iOffset );
+		}
+#else
 		char tmp[512];
 		long iAddress = VDDebugInfo::VDDebugInfoLookupRVA(pctx, (unsigned int)ptr, tmp, sizeof(tmp));
 		if( iAddress >= 0 )
@@ -383,8 +399,9 @@ namespace SymbolLookup
 		}
 
 		wsprintf( buf, "%08lx: %s!%08lx",
-			(unsigned long) ptr, sName.c_str(), 
+			(unsigned long) ptr, sName.c_str(),
 			(unsigned long) meminfo.AllocationBase );
+#endif
 	}
 }
 
@@ -706,7 +723,7 @@ BOOL CrashDialog::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
 			}
 
 			// TODO: Return a different brush if the default is not desired
-			return (BOOL)hbr;
+			return (INT_PTR)hbr;
 		}
 
 	case WM_COMMAND:

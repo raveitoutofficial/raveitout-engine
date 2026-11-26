@@ -1,0 +1,2 @@
+libusb-win32 1.4.0.2 (LGPL), x64 import library for libusb0.dll.
+Source: https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2 (libusb-win32-bin-1.4.0.2.zip, lib/msvc_x64)

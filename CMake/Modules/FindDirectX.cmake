@@ -6,22 +6,34 @@
 #  DIRECTX_INCLUDE_DIR
 #  DIRECTX_LIBRARIES
 
+# Direct3D 9, DirectSound and DirectInput headers/libs ship with the modern
+# Windows SDK. The legacy June 2010 DirectX SDK (DXSDK_DIR) is no longer
+# needed: the engine stopped using D3DX and DxErr. If it is installed anyway,
+# its paths are still picked up, but nothing requires it.
+
 if(NOT WIN32)
   return()
 endif()
 
 if(NOT EXISTS "$ENV{DXSDK_DIR}")
-  message(FATAL_ERROR "Could not find Microsoft DirectX SDK installation!")
+  set(DIRECTX_FOUND TRUE)
+  set(DIRECTX_INCLUDE_DIR "")
+  set(DIRECTX_LIBRARIES "")
+  return()
+endif()
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(DIRECTX_ARCH "x64")
+else()
+  set(DIRECTX_ARCH "x86")
 endif()
 
 set(DIRECTX_INCLUDE_SEARCH_PATHS
-  # TODO: Do not be limited to x86 in the future.
   "$ENV{DXSDK_DIR}/Include"
 )
 
 set(DIRECTX_LIBRARY_SEARCH_PATHS
-  # TODO: Do not be limited to x86 in the future.
-  "$ENV{DXSDK_DIR}/Lib/x86"
+  "$ENV{DXSDK_DIR}/Lib/${DIRECTX_ARCH}"
 )
 
 find_path(DIRECTX_INCLUDE_DIR

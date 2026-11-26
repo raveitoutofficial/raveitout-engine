@@ -149,6 +149,13 @@ endif()
 if(MSVC)
   # TODO: Find a way to do this cleanly for non MSVC users.
   set(SM_COMPILE_FLAGS "${SM_COMPILE_FLAGS} /MP2")
+  # The engine uses C++17 features (inline variables etc.), as on macOS.
+  set(SM_COMPILE_FLAGS "${SM_COMPILE_FLAGS} /std:c++17")
+  # Keep pre-C++17 library pieces (std::binary_function etc.) that MSVC's
+  # C++17 mode removes; Apple's libc++ still provides them.
+  set(SM_COMPILE_FLAGS "${SM_COMPILE_FLAGS} /D_HAS_AUTO_PTR_ETC=1")
+  # 'using namespace std' + C++17 std::byte clashes with the Windows SDK's byte.
+  set(SM_COMPILE_FLAGS "${SM_COMPILE_FLAGS} /D_HAS_STD_BYTE=0")
 endif()
 
 set_target_properties("${SM_EXE_NAME}" PROPERTIES
@@ -413,17 +420,20 @@ if (WIN32)
     "hid.lib"
   )
 
-  get_filename_component(DIRECTX_LIBRARY_DIR "${DIRECTX_LIBRARIES}" DIRECTORY)
-
-
   if (SDL2_FOUND)
     sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SDL2_LIBRARY}\"")
   endif()
 
-  sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${DIRECTX_LIBRARY_DIR}\"")
-  sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SM_EXTERN_DIR}/ffmpeg/lib\"")
-  sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SM_EXTERN_DIR}/libusb/lib/msvc\"")
-  sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SM_SRC_DIR}/archutils/Win32/ddk\"")
+  if (DIRECTX_LIBRARIES)
+    get_filename_component(DIRECTX_LIBRARY_DIR "${DIRECTX_LIBRARIES}" DIRECTORY)
+    sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${DIRECTX_LIBRARY_DIR}\"")
+  endif()
+  sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SM_WIN_FFMPEG_DIR}/lib\"")
+  sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SM_WIN_LIBUSB_LIB_DIR}\"")
+  if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    # 32-bit copies of dbghelp/hid/setupapi; x64 uses the Windows SDK's.
+    sm_add_link_flag("${SM_EXE_NAME}" "/LIBPATH:\"${SM_SRC_DIR}/archutils/Win32/ddk\"")
+  endif()
   sm_add_link_flag("${SM_EXE_NAME}" "/ERRORREPORT:SEND")
   sm_add_link_flag("${SM_EXE_NAME}" "/MAPINFO:EXPORTS")
   sm_add_link_flag("${SM_EXE_NAME}" "/SAFESEH:NO")
@@ -622,7 +632,7 @@ if(NOT APPLE)
       )
     endif()
     list(APPEND SM_INCLUDE_DIRS
-      "${SM_EXTERN_DIR}/ffmpeg/include"
+      "${SM_WIN_FFMPEG_DIR}/include"
     )
   else()
     if(WITH_OGG)

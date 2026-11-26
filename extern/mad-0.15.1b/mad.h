@@ -24,6 +24,10 @@
 extern "C" {
 # endif
 
+/* x64 MSVC has no inline asm; FPM_64BIT is checked before FPM_INTEL below. */
+# if defined(_M_X64) && !defined(FPM_64BIT)
+#  define FPM_64BIT
+# endif
 # define FPM_INTEL
 
 

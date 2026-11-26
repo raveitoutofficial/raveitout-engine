@@ -291,7 +291,13 @@ static long MainExceptionHandler( EXCEPTION_POINTERS *pExc )
 	case EXCEPTION_FLT_OVERFLOW:
 	case EXCEPTION_FLT_UNDERFLOW:
 	case EXCEPTION_FLT_INEXACT_RESULT:
+#if defined(_M_X64)
+		// x64 does float math in SSE: re-mask its exceptions (and x87's too).
+		pExc->ContextRecord->MxCsr |= 0x1F80;
+		pExc->ContextRecord->FltSave.ControlWord |= 0x3F;
+#else
 		pExc->ContextRecord->FloatSave.ControlWord |= 0x3F;
+#endif
 		return EXCEPTION_CONTINUE_EXECUTION;
 	}
 
@@ -364,10 +370,11 @@ long __stdcall CrashHandler::ExceptionHandler( EXCEPTION_POINTERS *pExc )
 	int iSize = 1024*32;
 	char *pStack = (char *) VirtualAlloc( NULL, iSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE );
 	pStack += iSize;
-	// FIXME: This will probably explode on x86-64
-#if defined(_MSC_VER)
+	// Only 32-bit x86 switches stacks; x64 has no inline asm and just runs the
+	// handler on the current stack.
+#if defined(_MSC_VER) && defined(_M_IX86)
 	_asm mov esp, pStack;
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && defined(__i386__)
 	asm volatile ("movl %%esp, %0\n\t"
 	:
 	: "r" (pStack)
@@ -462,7 +469,49 @@ static bool PointsToValidCall( unsigned long ptr )
 	return IsValidCall(buf+7, len);
 }
 
-void CrashHandler::do_backtrace( const void **buf, size_t size, 
+#if defined(_M_X64)
+/* x64: walk the stack with the OS unwinder, using the unwind tables every x64
+ * image carries. (The x86 version below scans the stack for call sites through
+ * the FS segment, which doesn't exist on x64.) Only valid for threads of this
+ * process, which is all the crash handler asks for. */
+void CrashHandler::do_backtrace( const void **buf, size_t size,
+						 HANDLE hProcess, HANDLE hThread, const CONTEXT *pContext )
+{
+	const void **pLast = buf + size - 1;
+	CONTEXT ctx = *pContext;
+
+	__try
+	{
+		while( buf != pLast && ctx.Rip != 0 )
+		{
+			*buf++ = (const void *) ctx.Rip;
+
+			DWORD64 iImageBase = 0;
+			PRUNTIME_FUNCTION pFunc = RtlLookupFunctionEntry( ctx.Rip, &iImageBase, NULL );
+			if( pFunc == NULL )
+			{
+				// Leaf function: the return address is on top of the stack.
+				ctx.Rip = *(DWORD64 *) ctx.Rsp;
+				ctx.Rsp += 8;
+			}
+			else
+			{
+				PVOID pHandlerData = NULL;
+				DWORD64 iEstablisherFrame = 0;
+				RtlVirtualUnwind( UNW_FLAG_NHANDLER, iImageBase, ctx.Rip, pFunc,
+					&ctx, &pHandlerData, &iEstablisherFrame, NULL );
+			}
+		}
+	}
+	__except( EXCEPTION_EXECUTE_HANDLER )
+	{
+		// Corrupt stack: keep the frames we already have.
+	}
+
+	*buf = NULL;
+}
+#else
+void CrashHandler::do_backtrace( const void **buf, size_t size,
 						 HANDLE hProcess, HANDLE hThread, const CONTEXT *pContext )
 {
 	const void **pLast = buf + size - 1;
@@ -536,6 +585,7 @@ void CrashHandler::do_backtrace( const void **buf, size_t size,
 
 	*buf = NULL;
 }
+#endif
 
 // Trigger the crash handler. This works even in the debugger.
 static void NORETURN debug_crash()

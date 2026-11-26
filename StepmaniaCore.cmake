@@ -259,9 +259,21 @@ endif()
 
 if(WIN32)
   set(SYSTEM_PCRE_FOUND FALSE)
+  # 64-bit builds use FFmpeg 5.1 x64 (LGPL shared); 32-bit keeps the old bundled 2.1.3.
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(SM_WIN_FFMPEG_DIR "${SM_EXTERN_DIR}/ffmpeg-5.1-win64" CACHE PATH "FFmpeg (include/lib/bin) for Windows builds")
+  else()
+    set(SM_WIN_FFMPEG_DIR "${SM_EXTERN_DIR}/ffmpeg" CACHE PATH "FFmpeg (include/lib/bin) for Windows builds")
+  endif()
   find_package(DirectX REQUIRED)
+  # libusb-win32 (libusb0): msvc = 32-bit, msvc_x64 = 64-bit (1.4.0.2).
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(SM_WIN_LIBUSB_LIB_DIR "${SM_EXTERN_DIR}/libusb/lib/msvc_x64")
+  else()
+    set(SM_WIN_LIBUSB_LIB_DIR "${SM_EXTERN_DIR}/libusb/lib/msvc")
+  endif()
   find_library(LIBUSB_WINDOWS_LIB NAMES "libusb"
-      PATHS "${SM_EXTERN_DIR}/libusb/lib/msvc" NO_DEFAULT_PATH
+      PATHS "${SM_WIN_LIBUSB_LIB_DIR}" NO_DEFAULT_PATH
     )
     get_filename_component(LIBUSB_WINDOWS_LIB ${LIBUSB_WINDOWS_LIB} NAME)
 
@@ -271,22 +283,22 @@ if(WIN32)
   else()
     # FFMPEG...it can be evil.
     find_library(LIB_SWSCALE NAMES "swscale"
-      PATHS "${SM_EXTERN_DIR}/ffmpeg/lib" NO_DEFAULT_PATH
+      PATHS "${SM_WIN_FFMPEG_DIR}/lib" NO_DEFAULT_PATH
     )
     get_filename_component(LIB_SWSCALE ${LIB_SWSCALE} NAME)
 
     find_library(LIB_AVCODEC NAMES "avcodec"
-      PATHS "${SM_EXTERN_DIR}/ffmpeg/lib" NO_DEFAULT_PATH
+      PATHS "${SM_WIN_FFMPEG_DIR}/lib" NO_DEFAULT_PATH
     )
     get_filename_component(LIB_AVCODEC ${LIB_AVCODEC} NAME)
 
     find_library(LIB_AVFORMAT NAMES "avformat"
-      PATHS "${SM_EXTERN_DIR}/ffmpeg/lib" NO_DEFAULT_PATH
+      PATHS "${SM_WIN_FFMPEG_DIR}/lib" NO_DEFAULT_PATH
     )
     get_filename_component(LIB_AVFORMAT ${LIB_AVFORMAT} NAME)
 
     find_library(LIB_AVUTIL NAMES "avutil"
-      PATHS "${SM_EXTERN_DIR}/ffmpeg/lib" NO_DEFAULT_PATH
+      PATHS "${SM_WIN_FFMPEG_DIR}/lib" NO_DEFAULT_PATH
     )
     get_filename_component(LIB_AVUTIL ${LIB_AVUTIL} NAME)
   endif()

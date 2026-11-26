@@ -3,6 +3,7 @@
 #include "windows.h"
 
 RString hr_ssprintf( int hr, const char *fmt, ... );
+RString DirectXErrorString( long hr );
 static char isAtLeastVista = 0;
 
 //Keep XP on life support

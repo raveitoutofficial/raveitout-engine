@@ -15,19 +15,16 @@
 #include "LocalizedString.h"
 #include "Preference.h"
 
-#include <D3dx9tex.h>
 #include <d3d9.h>
-#include <dxerr.h>
 
 #include "archutils/Win32/GraphicsWindow.h"
 #include "archutils/Win32/DirectXHelpers.h"
 
 // Static libraries
 // load Windows D3D9 dynamically
+// (No D3DX / DxErr: those came from the legacy June 2010 DirectX SDK.)
 #if defined(_MSC_VER)
 	#pragma comment(lib, "d3d9.lib")
-	#pragma comment(lib, "d3dx9.lib")
-	#pragma comment(lib, "DxErr.lib")
 #endif
 
 #include <math.h>
@@ -35,7 +32,7 @@
 
 RString GetErrorString( HRESULT hr )
 {
-	return DXGetErrorString(hr);
+	return DirectXErrorString(hr);
 }
 
 // Globals
@@ -59,6 +56,18 @@ map<unsigned,int>		g_TexResourceToPaletteIndex;
 list<int>			g_PaletteIndex;
 struct TexturePalette { PALETTEENTRY p[256]; };
 map<unsigned,TexturePalette>	g_TexResourceToTexturePalette;
+
+/* Texture handles are small integers mapped to D3D textures. The engine's
+ * handle type is a 32-bit unsigned, which can't hold a pointer on x64 (it used
+ * to be the IDirect3DTexture9 pointer itself, which crashed 64-bit builds). */
+static map<unsigned, IDirect3DTexture9*> g_TextureHandles;
+static unsigned g_iNextTextureHandle = 1;
+
+static IDirect3DTexture9 *TextureFromHandle( unsigned iTexHandle )
+{
+	map<unsigned, IDirect3DTexture9*>::const_iterator it = g_TextureHandles.find( iTexHandle );
+	return it == g_TextureHandles.end() ? NULL : it->second;
+}
 
 // Load the palette, if any, for the given texture into a palette slot, and make it current.
 static void SetPalette( unsigned TexResource )
@@ -699,11 +708,14 @@ RageSurface* RageDisplay_D3D::CreateScreenshot()
 		D3DSURFACE_DESC desc;
 		pSurface->GetDesc( &desc );
 
-		// Copy the back buffer into a surface of a type we support.
+		// Copy the back buffer into system memory (no D3DX: GetRenderTargetData
+		// needs a same-format SYSTEMMEM surface). Only 32-bit back buffers are
+		// handled; their memory layout matches what D3DX used to produce.
+		const bool b32Bit = desc.Format == D3DFMT_A8R8G8B8 || desc.Format == D3DFMT_X8R8G8B8;
 		IDirect3DSurface9* pCopy;
-		if( SUCCEEDED( g_pd3dDevice->CreateOffscreenPlainSurface( desc.Width, desc.Height, D3DFMT_A8R8G8B8, D3DPOOL_SCRATCH, &pCopy, NULL ) ) )
+		if( b32Bit && SUCCEEDED( g_pd3dDevice->CreateOffscreenPlainSurface( desc.Width, desc.Height, desc.Format, D3DPOOL_SYSTEMMEM, &pCopy, NULL ) ) )
 		{
-			if( SUCCEEDED( D3DXLoadSurfaceFromSurface( pCopy, NULL, NULL, pSurface, NULL, NULL, D3DX_FILTER_NONE, 0) ) )
+			if( SUCCEEDED( g_pd3dDevice->GetRenderTargetData( pSurface, pCopy ) ) )
 			{
 				// Update desc from the copy.
 				pCopy->GetDesc( &desc );
@@ -717,7 +729,18 @@ RageSurface* RageDisplay_D3D::CreateScreenshot()
 					rect.right = desc.Width;
 					rect.bottom = desc.Height;
 
-					pCopy->LockRect( &lr, &rect, D3DLOCK_READONLY );
+					pCopy->LockRect( &lr, &rect, desc.Format == D3DFMT_X8R8G8B8 ? 0 : D3DLOCK_READONLY );
+				}
+
+				// X8R8G8B8's unused byte is undefined; make the screenshot opaque.
+				if( desc.Format == D3DFMT_X8R8G8B8 )
+				{
+					for( UINT y = 0; y < desc.Height; ++y )
+					{
+						DWORD *row = (DWORD *) ((BYTE *) lr.pBits + y * lr.Pitch);
+						for( UINT x = 0; x < desc.Width; ++x )
+							row[x] |= 0xFF000000;
+					}
 				}
 
 				RageSurface *surface = CreateSurfaceFromPixfmt( RagePixelFormat_RGBA8, lr.pBits, desc.Width, desc.Height, lr.Pitch);
@@ -1105,7 +1128,7 @@ void RageDisplay_D3D::SetTexture( TextureUnit tu, unsigned iTexture )
 	}
 	else
 	{
-		IDirect3DTexture9* pTex = (IDirect3DTexture9*) iTexture;
+		IDirect3DTexture9* pTex = TextureFromHandle( iTexture );
 		g_pd3dDevice->SetTexture( tu, pTex );
 
 		/* Intentionally commented out. Don't mess with texture stage state
@@ -1401,8 +1424,10 @@ void RageDisplay_D3D::DeleteTexture( unsigned iTexHandle )
 	if( iTexHandle == 0 )
 		return;
 
-	IDirect3DTexture9* pTex = (IDirect3DTexture9*) iTexHandle;
-	pTex->Release();
+	IDirect3DTexture9* pTex = TextureFromHandle( iTexHandle );
+	if( pTex != NULL )
+		pTex->Release();
+	g_TextureHandles.erase( iTexHandle );
 
 	// Delete palette (if any)
 	if( g_TexResourceToPaletteIndex.find(iTexHandle) != g_TexResourceToPaletteIndex.end() )
@@ -1425,7 +1450,10 @@ unsigned RageDisplay_D3D::CreateTexture(
 		RageException::Throw( "CreateTexture(%i,%i,%s) failed: %s", 
 		img->w, img->h, RagePixelFormatToString(pixfmt).c_str(), GetErrorString(hr).c_str() );
 
-	unsigned uTexHandle = (unsigned)pTex;
+	unsigned uTexHandle = g_iNextTextureHandle++;
+	if( g_iNextTextureHandle == 0 ) // wrapped (would take 4 billion textures)
+		g_iNextTextureHandle = 1;
+	g_TextureHandles[uTexHandle] = pTex;
 
 	if( pixfmt == RagePixelFormat_PAL )
 	{
@@ -1455,7 +1483,7 @@ void RageDisplay_D3D::UpdateTexture(
 	RageSurface* img,
 	int xoffset, int yoffset, int width, int height )
 {
-	IDirect3DTexture9* pTex = (IDirect3DTexture9*)uTexHandle;
+	IDirect3DTexture9* pTex = TextureFromHandle( uTexHandle );
 	ASSERT( pTex != NULL );
 
 	RECT rect; 

@@ -81,7 +81,7 @@ static HBITMAP LoadWin32Surface( RString sFile, HWND hWnd )
         return ret;
 }
 
-BOOL CALLBACK LoadingWindow_Win32::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
+INT_PTR CALLBACK LoadingWindow_Win32::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
 	switch( msg )
 	{
@@ -118,8 +118,8 @@ void LoadingWindow_Win32::SetIcon( const RageSurface *pIcon )
 
 	m_hIcon = IconFromSurface( pIcon );
 	if( m_hIcon != NULL )
-		// XXX: GCL_HICON isn't available on x86-64 Windows
-		SetClassLong( hwnd, GCL_HICON, (LONG) m_hIcon );
+		// GCLP_HICON + SetClassLongPtr work on both 32- and 64-bit Windows.
+		SetClassLongPtr( hwnd, GCLP_HICON, (LONG_PTR) m_hIcon );
 }
 
 void LoadingWindow_Win32::SetSplash( const RageSurface *pSplash )
