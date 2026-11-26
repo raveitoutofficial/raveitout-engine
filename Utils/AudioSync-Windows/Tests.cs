@@ -37,6 +37,25 @@ static class Tests
         PrefsINI.WriteOffset(-0.1, nokey);
         Check(File.ReadAllText(nokey) == "[Game]\r\nA=1\r\n[Options]\r\nGlobalOffsetSeconds=-0.100000\r\nB=2\r\n", "key added under [Options]");
 
+        // display modes: resolution + theme, per-game Theme only where it is a Rave It Out theme
+        string disp = Path.Combine(work, "display.ini");
+        File.WriteAllText(disp, "[Options]\r\nDisplayAspectRatio=1.777778\r\nDisplayHeight=720\r\nDisplayWidth=1280\r\nTheme=RaveItOut\r\n\r\n"
+                              + "[Game-dance]\r\nTheme=default\r\n\r\n[Game-pump]\r\nTheme=RaveItOut\r\n");
+        Check(DisplayMode.Read(disp) == DisplayMode.All[1], "reads HD 720p");
+        PrefsINI.WriteDisplay(DisplayMode.All[0], disp);
+        Check(File.ReadAllText(disp) == "[Options]\r\nDisplayAspectRatio=1.333333\r\nDisplayHeight=480\r\nDisplayWidth=640\r\nTheme=RaveItOut-SD-mipmaps\r\n\r\n"
+                                       + "[Game-dance]\r\nTheme=default\r\n\r\n[Game-pump]\r\nTheme=RaveItOut-SD-mipmaps\r\n", "SD written, dance theme untouched");
+        Check(DisplayMode.Read(disp) == DisplayMode.All[0], "reads SD back");
+        PrefsINI.WriteDisplay(DisplayMode.All[2], disp);
+        Check(DisplayMode.Read(disp) == DisplayMode.All[2], "Full HD round-trips");
+        string dispCopy = Path.Combine(work, "display-real.ini");
+        File.Copy(src, dispCopy, true);
+        var was = DisplayMode.Read(dispCopy);
+        PrefsINI.WriteDisplay(DisplayMode.All[0], dispCopy);
+        Check(DisplayMode.Read(dispCopy) == DisplayMode.All[0], "SD on a copy of the real prefs");
+        Check(File.ReadAllBytes(dispCopy).Length > 0 && File.ReadAllText(dispCopy).Split('\n').Length == File.ReadAllText(src).Split('\n').Length,
+              "real prefs: no lines added or lost (was " + (was?.Name ?? "custom") + ")");
+
         // profiles JSON: a Mac-written file must re-encode byte-for-byte
         if (args.Length > 2)
         {

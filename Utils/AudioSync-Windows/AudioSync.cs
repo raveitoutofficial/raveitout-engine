@@ -150,6 +150,95 @@ namespace RaveItOut.AudioSync
             AtomicWrite(path, Bytes.GetBytes(result));
         }
 
+        /// Value of key in [section], or null.
+        public static string ReadValue(string path, string section, string key)
+        {
+            string text;
+            try { text = Bytes.GetString(File.ReadAllBytes(path)); } catch { return null; }
+            string cur = "";
+            foreach (var l in Lines(text))
+            {
+                string t = l.Text.Trim();
+                if (IsSection(t)) { cur = t; continue; }
+                if (cur == section && t.StartsWith(key + "=")) return t.Substring(key.Length + 1).Trim();
+            }
+            return null;
+        }
+
+        /// Set key=value in every section that `inSection` accepts. With add, a missing key is
+        /// added right after the section header. Only the touched lines change.
+        public static string SetValue(string text, Func<string, bool> inSection, string key, string value, bool add)
+        {
+            string eol = text.Contains("\r\n") ? "\r\n" : "\n";
+            string entry = key + "=" + value;
+            string cur = "";
+            Line? header = null;
+            bool found = false;
+            // Walk backwards through edits by collecting them first.
+            var edits = new List<Tuple<int, int, string>>();   // start, end, replacement
+            Action closeSection = () =>
+            {
+                if (header.HasValue && !found && add)
+                {
+                    int after = text.IndexOf('\n', header.Value.End);
+                    int at = after < 0 ? text.Length : after + 1;
+                    edits.Add(Tuple.Create(at, at, (after < 0 ? eol : "") + entry + eol));
+                }
+            };
+            foreach (var l in Lines(text))
+            {
+                string t = l.Text.Trim();
+                if (IsSection(t))
+                {
+                    closeSection();
+                    cur = t; found = false;
+                    header = inSection(t) ? l : (Line?)null;
+                    continue;
+                }
+                if (header.HasValue && t.StartsWith(key + "="))
+                {
+                    found = true;
+                    edits.Add(Tuple.Create(l.Start, l.End, entry));
+                }
+            }
+            closeSection();
+            foreach (var e in edits.OrderByDescending(e => e.Item1))
+                text = text.Substring(0, e.Item1) + e.Item3 + text.Substring(e.Item2);
+            return text;
+        }
+
+        /// Write a display mode: resolution in [Options], theme in [Options] and in every
+        /// per-game section whose Theme is one of the Rave It Out themes (they override [Options]).
+        public static void WriteDisplay(DisplayMode m, string path)
+        {
+            string text = Bytes.GetString(File.ReadAllBytes(path));
+            Func<string, bool> options = s => s == "[Options]";
+            text = SetValue(text, options, "DisplayWidth", m.Width.ToString(CultureInfo.InvariantCulture), true);
+            text = SetValue(text, options, "DisplayHeight", m.Height.ToString(CultureInfo.InvariantCulture), true);
+            text = SetValue(text, options, "DisplayAspectRatio", m.Aspect, true);
+            text = SetValue(text, options, "Theme", m.Theme, true);
+            foreach (var game in GameSectionsWithRioTheme(text))
+                text = SetValue(text, s => s == game, "Theme", m.Theme, false);
+            AtomicWrite(path, Bytes.GetBytes(text));
+        }
+
+        static List<string> GameSectionsWithRioTheme(string text)
+        {
+            var list = new List<string>();
+            string cur = "";
+            foreach (var l in Lines(text))
+            {
+                string t = l.Text.Trim();
+                if (IsSection(t)) { cur = t; continue; }
+                if (cur.StartsWith("[Game-") && t.StartsWith("Theme="))
+                {
+                    string v = t.Substring(6).Trim();
+                    if (DisplayMode.All.Any(m => m.Theme == v)) list.Add(cur);
+                }
+            }
+            return list;
+        }
+
         public static void AtomicWrite(string path, byte[] data)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
@@ -157,6 +246,33 @@ namespace RaveItOut.AudioSync
             File.WriteAllBytes(tmp, data);
             if (File.Exists(path)) File.Replace(tmp, path, null);
             else File.Move(tmp, path);
+        }
+    }
+
+    // MARK: - Display modes (SD theme for 4:3 CRT cabinets, HD theme for 16:9 screens)
+
+    class DisplayMode
+    {
+        public string Name, Aspect, Theme;
+        public int Width, Height;
+
+        public static readonly DisplayMode[] All =
+        {
+            new DisplayMode { Name = "SD 480p — 4:3 CRT (640×480)", Width = 640, Height = 480, Aspect = "1.333333", Theme = "RaveItOut-SD-mipmaps" },
+            new DisplayMode { Name = "HD 720p (1280×720)", Width = 1280, Height = 720, Aspect = "1.777778", Theme = "RaveItOut" },
+            new DisplayMode { Name = "Full HD 1080p (1920×1080)", Width = 1920, Height = 1080, Aspect = "1.777778", Theme = "RaveItOut" },
+        };
+
+        /// The mode Preferences.ini is set to now, or null when it matches none of them.
+        public static DisplayMode Read(string path)
+        {
+            int w, h;
+            if (!int.TryParse(PrefsINI.ReadValue(path, "[Options]", "DisplayWidth"), out w)) return null;
+            if (!int.TryParse(PrefsINI.ReadValue(path, "[Options]", "DisplayHeight"), out h)) return null;
+            string theme = PrefsINI.ReadValue(path, "[Options]", "Theme");
+            string pump = PrefsINI.ReadValue(path, "[Game-pump]", "Theme");
+            if (!string.IsNullOrEmpty(pump)) theme = pump;
+            return All.FirstOrDefault(m => m.Width == w && m.Height == h && m.Theme == theme);
         }
     }
 
@@ -434,6 +550,8 @@ namespace RaveItOut.AudioSync
         public string DeviceName = "", DeviceGlyph = "";
         public string Status = "";
         public bool AutoApply, CloseAfterLaunch;
+        public DisplayMode GameDisplay;   // what Preferences.ini is set to (null = none of ours)
+        public DisplayMode Display;       // what Apply will write (null = leave as is)
         public event Action Changed = delegate { };
 
         public AppModel()
@@ -442,6 +560,7 @@ namespace RaveItOut.AudioSync
             CloseAfterLaunch = Settings.GetBool("closeAfterLaunch", true);
             GameFolder = LocateGameFolder();
             RefreshGameOffset();
+            Display = GameDisplay;
             LoadProfiles();
             RefreshDevice(true);
             RefreshRunning();
@@ -539,7 +658,14 @@ namespace RaveItOut.AudioSync
             GameOffset.HasValue ? Profiles.FirstOrDefault(p => Fmt.Same(p.Offset, GameOffset.Value)) : null;
 
         // Game state
-        public void RefreshGameOffset() => GameOffset = PrefsPath == null ? null : PrefsINI.ReadOffset(PrefsPath);
+        public void RefreshGameOffset()
+        {
+            GameOffset = PrefsPath == null ? null : PrefsINI.ReadOffset(PrefsPath);
+            GameDisplay = PrefsPath == null ? null : DisplayMode.Read(PrefsPath);
+        }
+
+        public bool HasTheme(string theme) =>
+            GameFolder != null && Directory.Exists(Path.Combine(GameFolder, "Themes", theme));
 
         /// True when the running state changed.
         public bool RefreshRunning()
@@ -585,9 +711,18 @@ namespace RaveItOut.AudioSync
             }
             try
             {
+                var d = Display;
+                if (d != null && !HasTheme(d.Theme))
+                {
+                    Status = "Theme “" + d.Theme + "” is missing — run Utils\\RaveItOut-SD\\make_sd_theme.py (see its README).";
+                    Notify();
+                    return false;
+                }
                 PrefsINI.WriteOffset(p.Offset, PrefsPath);
+                if (d != null && d != GameDisplay) PrefsINI.WriteDisplay(d, PrefsPath);
                 RefreshGameOffset();
-                Status = "Global offset set to " + Fmt.Offset(p.Offset) + " s (" + p.Name + ").";
+                Status = "Global offset set to " + Fmt.Offset(p.Offset) + " s (" + p.Name + ")"
+                       + (d != null ? "; display " + d.Name + "." : ".");
                 Notify();
                 return true;
             }
@@ -794,6 +929,7 @@ namespace RaveItOut.AudioSync
         readonly NeonButton resetBtn = new NeonButton("Reset to 0"), useGameBtn = new NeonButton("Use game's value"),
                             linkBtn = new NeonButton("Link"), unlinkBtn = new NeonButton("Unlink");
         readonly CheckBox autoApplyBox = new CheckBox(), closeBox = new CheckBox();
+        readonly ComboBox displayBox = new ComboBox();
         readonly Label runningLabel = new Label(), statusLabel = new Label(), folderLabel = new Label();
         readonly NeonButton applyBtn = new NeonButton("Apply"), playBtn = new NeonButton("Apply && Play", true),
                             changeBtn = new NeonButton("Change…");
@@ -807,8 +943,8 @@ namespace RaveItOut.AudioSync
             AutoScaleDimensions = new SizeF(96f, 96f);
             AutoScaleMode = AutoScaleMode.Dpi;
             Text = "Rave It Out Audio Sync";
-            ClientSize = new Size(760, 560);
-            MinimumSize = new Size(740, 560);
+            ClientSize = new Size(760, 604);
+            MinimumSize = new Size(740, 604);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Rio.BG; ForeColor = Color.White; Font = Rio.UI(9f);
             KeyPreview = true;
@@ -842,7 +978,7 @@ namespace RaveItOut.AudioSync
             Controls.AddRange(new Control[] { title, deviceGlyph, deviceLabel, gameOffsetLabel });
 
             // Profiles panel
-            int top = 86, bottom = H - 120;
+            int top = 86, bottom = H - 164;
             var left = new RoundPanel { Bounds = new Rectangle(18, top, 240, bottom - top), Anchor = AT | AB | AL };
             var cap = Rio.Caption("DEVICE PROFILES"); cap.Location = new Point(14, 12);
             list.Model = model;
@@ -927,6 +1063,27 @@ namespace RaveItOut.AudioSync
             editor.Controls.AddRange(new Control[] { nameCap, nameBox, offCap, msLabel, resetBtn, useGameBtn, offHelp,
                                                      linkCap, linkedLabel, unlinkBtn, linkBtn, linkHelp, autoApplyBox, noSelection });
             Controls.Add(editor);
+
+            // Display mode: SD (4:3 CRT theme) or HD / Full HD (widescreen theme)
+            var dispCap = new Label { Text = "Game display", AutoSize = true, ForeColor = Rio.Dim, Font = Rio.UI(9f, FontStyle.Bold),
+                                      Location = new Point(18, H - 148), Anchor = AB | AL };
+            displayBox.DropDownStyle = ComboBoxStyle.DropDownList; displayBox.FlatStyle = FlatStyle.Flat;
+            displayBox.BackColor = Rio.Field; displayBox.ForeColor = Color.White; displayBox.Font = Rio.UI(9.75f);
+            displayBox.Bounds = new Rectangle(124, H - 152, 270, 26); displayBox.Anchor = AB | AL;
+            displayBox.Items.Add("Keep current setting");
+            foreach (var m in DisplayMode.All) displayBox.Items.Add(m.Name);
+            displayBox.SelectedIndexChanged += (s, e) =>
+            {
+                if (updating) return;
+                int i = displayBox.SelectedIndex;
+                model.Display = i <= 0 ? null : DisplayMode.All[i - 1];
+                if (model.AutoApply) model.Apply(); else model.Notify();
+            };
+            tips.SetToolTip(displayBox, "Resolution and theme the game starts with. SD = 640×480 4:3 CRT theme; HD / Full HD = widescreen theme.");
+            var dispHint = new Label { Text = "SD = 640×480 CRT theme  ·  HD / Full HD = widescreen theme", AutoSize = false,
+                                       ForeColor = Rio.Faint, Font = Rio.UI(8.25f), TextAlign = ContentAlignment.MiddleLeft,
+                                       Bounds = new Rectangle(404, H - 150, W - 404 - 18, 22), Anchor = AB | AL | AR, AutoEllipsis = true };
+            Controls.AddRange(new Control[] { dispCap, displayBox, dispHint });
 
             // Footer
             runningLabel.Text = "⚠  Rave It Out is running. Quit it before applying — it saves its settings on exit.";
@@ -1071,6 +1228,10 @@ namespace RaveItOut.AudioSync
                 linkBtn.Text = "Link to “" + model.DeviceName + "”";
                 autoApplyBox.Checked = model.AutoApply;
             }
+
+            // display
+            displayBox.SelectedIndex = model.Display == null ? 0 : Array.IndexOf(DisplayMode.All, model.Display) + 1;
+            displayBox.Enabled = !model.GameRunning;
 
             // footer
             runningLabel.Visible = model.GameRunning;

@@ -7,6 +7,11 @@ profiles move between the two builds:
   byte for byte).
 - **Apply** writes `GlobalOffsetSeconds` in `Save\Preferences.ini`. Only that line changes; every other byte,
   including the CRLF line endings, stays the same. **Apply & Play** also starts `Program\StepMania.exe`.
+- **Game display** picks how the game starts: **SD 480p** (640×480 4:3, the CRT theme `RaveItOut-SD-mipmaps`),
+  **HD 720p** (1280×720) or **Full HD 1080p** (1920×1080), both with the widescreen theme `RaveItOut`.
+  Apply writes `DisplayWidth`/`DisplayHeight`/`DisplayAspectRatio`/`Theme` in `[Options]`, and `Theme` in any
+  `[Game-…]` section that already uses a Rave It Out theme. "Keep current setting" leaves them alone. If the SD
+  theme hasn't been generated yet, Apply stops and says to run `Utils\RaveItOut-SD\make_sd_theme.py`.
 - **Link** a profile to the current Windows sound output (default playback device); it's picked
   automatically when that device becomes the default (optionally applied too).
 - **Save game value** turns the offset you found in-game into a new profile.
