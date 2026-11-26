@@ -16,6 +16,9 @@ local OPLIST_ScrollAt = 16
 local OPTIONSLIST_NOTESKINS = OptionRowAvailableNoteskins().Choices
 local OPTIONSLIST_NUMNOTESKINS = #OPTIONSLIST_NOTESKINS;
 
+--Menus whose items are other menus (their descriptions come per item).
+local MENU_LISTS = { SongMenu=true, System=true, ITGMods=true, PumpMods=true }
+
 local t = Def.ActorFrame{
 	-- SOUNDS
 	LoadActor(THEME:GetPathS("OptionsList","Move"))..{
@@ -83,6 +86,12 @@ for pn in ivalues(GAMESTATE:GetHumanPlayers()) do
 				self:x(moveTowards);
 			end
 		end;
+		--Reset (engine) clears the player's modifiers; also clear the theme's own.
+		OptionsListResettingMessageCommand=function(self,params)
+			if params.Player == pn then
+				ResetThemeModifiers(pn);
+			end;
+		end;
 		OptionsListClosedMessageCommand=function(self,params)
 			if params.Player == pn then
 				self:stoptweening();
@@ -122,7 +131,7 @@ for pn in ivalues(GAMESTATE:GetHumanPlayers()) do
 			AdjustCommand=function(self,params)
 				--SCREENMAN:SystemMessage(currentOpList..", "..params.Selection.." "..THEME:GetMetric("ScreenOptionsMaster",currentOpList..","..params.Selection+1))
 				if params.Player == pn then
-					if currentOpList == "SongMenu" or currentOpList == "System" then
+					if MENU_LISTS[currentOpList] then
 						
 						if params.Selection+1 <= numRows then
 							local itemName = split(";",string.gsub(THEME:GetMetric("ScreenOptionsMaster",currentOpList..","..params.Selection+1),"name,",""))[1]
@@ -165,7 +174,7 @@ for pn in ivalues(GAMESTATE:GetHumanPlayers()) do
 				if params.Player == pn then
 					currentOpList=params.Menu
 					optionsListActor:stoptweening():y(SCREEN_CENTER_Y-100) --Reset the positioning
-					if params.Menu ~= "SongMenu" and params.Menu ~= "System" then
+					if not MENU_LISTS[params.Menu] then
 						self:settext(THEME:GetString("OptionExplanations",params.Menu))
 					else
 						--SCREENMAN:SystemMessage(params.Size);

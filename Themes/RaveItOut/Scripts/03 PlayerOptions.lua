@@ -34,6 +34,20 @@ PlayerDefaults = {
 	TargetScore = false,
 }
 
+--Called when Reset is chosen in the OptionsList. Turns off the theme's own
+--gameplay options; keeps personal look settings (judgment graphic, screen
+--filter, profile icon) like the engine keeps speed and noteskin.
+function ResetThemeModifiers(pn)
+	local keep = { JudgmentGraphic=true, ScreenFilter=true, ProfileIcon=true }
+	local mods = ActiveModifiers[pname(pn)]
+	if mods then
+		for k, v in pairs(PlayerDefaults) do
+			if not keep[k] then mods[k] = v end
+		end
+	end
+	PerfectionistMode[pn] = false
+end
+
 --PerfectionistMode should NEVER be written to profile, so it's not in the PlayerDefaults table.
 PerfectionistMode = {
 	PlayerNumber_P1 = false,

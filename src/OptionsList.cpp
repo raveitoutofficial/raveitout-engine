@@ -137,10 +137,12 @@ void OptionListRow::SetUnderlines( const vector<bool> &aSelections, const Option
 			const OptionRowHandler *pTarget = m_pOptions->m_Rows[sDest];
 			if( pTarget->m_Def.m_selectType == SELECT_ONE )
 			{
-				int iSelection = m_pOptions->GetOneSelection(sDest);
+				/* Menus of menus (TopMenus) never have a selection: -1 means
+				 * "nothing changed" rather than an error. */
+				int iSelection = m_pOptions->GetOneSelection(sDest, true);
 				const OptionRowHandler *lHandler = m_pOptions->m_Rows.find(sDest)->second;
 				int iDefault = lHandler->GetDefaultOption();
-				if( iDefault != -1 && iSelection != iDefault )
+				if( iSelection != -1 && iDefault != -1 && iSelection != iDefault )
 					bSelected |= true;
 			}
 			else if( pTarget->m_Def.m_selectType == SELECT_MULTIPLE )
@@ -604,6 +606,10 @@ void OptionsList::Pop()
 
 void OptionsList::Push( RString sDest )
 {
+	/* Other menus may have changed the same modifiers (e.g. Reverse is in
+	 * both the ITG and the Pump lists), so show what is really on now. */
+	if( m_Rows.find(sDest) != m_Rows.end() )
+		ImportRow( sDest );
 	m_asMenuStack.push_back( sDest );
 	SetDefaultCurrentRow();
 	SwitchToCurrentRow();
@@ -682,8 +688,28 @@ bool OptionsList::Start()
 		pHandler->GetIconTextAndGameCommand( m_iMenuStackSelection, sIconText, gc );
 		if( gc.m_sName == RESET_ROW )
 		{
-			GAMESTATE->m_pPlayerState[m_pn]->ResetToDefaultPlayerOptions( ModsLevel_Preferred );
+			/* Reset turns every modifier off, but keeps the player's own
+			 * speed and noteskin: those are settings, not modifiers. */
+			PlayerState *pPS = GAMESTATE->m_pPlayerState[m_pn];
+			const PlayerOptions poOld = pPS->m_PlayerOptions.GetPreferred();
+			pPS->ResetToDefaultPlayerOptions( ModsLevel_Preferred );
 			GAMESTATE->ResetToDefaultSongOptions( ModsLevel_Preferred );
+			PlayerOptions poNew = pPS->m_PlayerOptions.GetPreferred();
+			poNew.m_fScrollSpeed = poOld.m_fScrollSpeed;
+			poNew.m_fScrollBPM = poOld.m_fScrollBPM;
+			poNew.m_fTimeSpacing = poOld.m_fTimeSpacing;
+			poNew.m_fMaxScrollBPM = poOld.m_fMaxScrollBPM;
+			if( !poOld.m_sNoteSkin.empty() )
+				poNew.m_sNoteSkin = poOld.m_sNoteSkin;
+			pPS->m_PlayerOptions.Assign( ModsLevel_Preferred, poNew );
+
+			/* Let the theme reset its own (Lua) options before the rows
+			 * re-import them below. */
+			{
+				Message msg("OptionsListResetting");
+				msg.SetParam( "Player", m_pn );
+				MESSAGEMAN->Broadcast( msg );
+			}
 
 			/* Import options. */
 			FOREACHM( RString, OptionRowHandler *, m_Rows, hand )
