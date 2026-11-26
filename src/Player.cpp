@@ -2720,7 +2720,9 @@ void Player::CrossedRows( int iLastRowCrossed, const RageTimer &now )
 			case TapNoteType_HoldHead:
 			{
 				tn.HoldResult.fLife = INITIAL_HOLD_LIFE;
-				if( !REQUIRE_STEP_ON_HOLD_HEADS )
+				// Only a head nobody has stepped on yet: an already-judged head
+				// (stepped early) must keep its judgment. (RIO fix)
+				if( !REQUIRE_STEP_ON_HOLD_HEADS && tn.result.tns == TNS_None )
 				{
 					PlayerNumber pn = m_pPlayerState->m_PlayerNumber;
 					vector<GameInput> GameI;
@@ -2732,15 +2734,20 @@ void Player::CrossedRows( int iLastRowCrossed, const RageTimer &now )
 							float fSecsHeld = INPUTMAPPER->GetSecsHeld(GameI[i], m_pPlayerState->m_mp);
 							if(fSecsHeld >= PREFSMAN->m_fPadStickSeconds)
 							{
-								Step(iTrack, -1, now - PREFSMAN->m_fPadStickSeconds, true, false);
+								Step(iTrack, iRow, now - PREFSMAN->m_fPadStickSeconds, true, false);
 							}
 						}
 					}
 					else
 					{
+						/* Judge THIS hold head (as mines below do). With row -1, Step()
+						 * searched about a second around now for the nearest unjudged
+						 * note, so with the head already stepped early it judged the
+						 * NEXT hold on this panel by the gap between them: chained holds
+						 * all repeated one judgment until the next tap. (RIO fix) */
 						if(INPUTMAPPER->IsBeingPressed(GameI, m_pPlayerState->m_mp))
 						{
-							Step(iTrack, -1, now, true, false);
+							Step(iTrack, iRow, now, true, false);
 						}
 					}
 				}
