@@ -43,6 +43,10 @@ return Def.ActorFrame{
         waited = waited + 5; self:sleep(5):queuecommand("Next"); return
       end
       shot(name)
+      if name == "ScreenGameplay" and top then
+        -- end the song early, same as the debug overlay's "Send Notes Ended" (F3 menu)
+        top:PostScreenMessage("SM_NotesEnded", 0)
+      end
       if st and st[1]:sub(1,5) == "WAIT:" then
         self:sleep(st[2]):queuecommand("Shot2"); return
       end
