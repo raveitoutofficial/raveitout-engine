@@ -42,6 +42,9 @@ return Def.ActorFrame {
 		InitCommand=cmd(SetAmbientLightColor,color("0.55,0.55,0.55,1");SetDiffuseLightColor,color("0.6,0.6,0.6,1");SetSpecularLightColor,color("1,1,1,1");SetLightDirection,{-0.45,-0.55,0.7});
 		PressCommand=press;
 		Def.Model {
+			-- No depth buffer: notes must always draw over the receptors (like the
+			-- 2D skin). Back-face culling (Model default) keeps the receptor itself right.
+			InitCommand=cmd(zbuffer,false);
 			Meshes=NOTESKIN:GetPath('_'..model..'Receptor','model');
 			Materials=NOTESKIN:GetPath('_'..model..'Receptor','model');
 			Bones=NOTESKIN:GetPath('_'..model..'Receptor','model');

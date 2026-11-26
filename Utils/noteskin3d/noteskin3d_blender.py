@@ -25,6 +25,7 @@ BEVEL = opt("--bevel", 2.5)
 SEGMENTS = opt("--segments", 3)
 RENDER = opt("--render", "")
 LIT = "--lit" in argv   # real engine lighting: plain walls + shiny materials
+TEXBASE = opt("--texbase", NAME)   # whose textures to use (e.g. pieces share the arrow's)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 data = json.load(open(os.path.join(DIR, "_%s outline.json" % NAME)))
@@ -108,7 +109,7 @@ for mi, g in enumerate(used):
 lines = ["// MilkShape 3D ASCII", "", "Frames: 1", "Frame: 1", "",
          "Meshes: %d" % len(used)] + mesh_lines + ["", "Materials: %d" % len(used)]
 for g in used:
-    tex = '"_%s tex.ini"' % NAME if g == 0 else '"_%s rim %d.png"' % (NAME, g - 1)
+    tex = '"_%s tex.ini"' % TEXBASE if g == 0 else '"_%s rim %d.png"' % (TEXBASE, g - 1)
     spec, shine = ("0.9 0.9 0.9 1.0", "40.0") if LIT else ("0.0 0.0 0.0 1.0", "0.0")
     lines += ['"m%d"' % g, "1.0 1.0 1.0 1.0", "1.0 1.0 1.0 1.0", spec, "0.0 0.0 0.0 1.0",
               shine, "1.0", tex, '"_shine sphere.png"']
