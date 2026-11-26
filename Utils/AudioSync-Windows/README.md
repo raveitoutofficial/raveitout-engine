@@ -12,6 +12,7 @@ profiles move between the two builds:
   Apply writes `DisplayWidth`/`DisplayHeight`/`DisplayAspectRatio`/`Theme` in `[Options]`, and `Theme` in any
   `[Game-…]` section that already uses a Rave It Out theme. "Keep current setting" leaves them alone. If the SD
   theme hasn't been generated yet, Apply stops and says to run `Utils\RaveItOut-SD\make_sd_theme.py`.
+  Apply & Play also passes `--theme=…` to the game. Like the offset, display writes are blocked while the game runs.
 - **Link** a profile to the current Windows sound output (default playback device); it's picked
   automatically when that device becomes the default (optionally applied too).
 - **Save game value** turns the offset you found in-game into a new profile.
