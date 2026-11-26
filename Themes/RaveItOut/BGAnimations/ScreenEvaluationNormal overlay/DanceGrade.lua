@@ -203,16 +203,9 @@ t[#t+1] = Def.ActorFrame{
 
 --MODS DISPLAY
 local function CurrentNoteSkin(p)
-	local mods = GAMESTATE:GetPlayerState(p):GetPlayerOptionsArray( 'ModsLevel_Preferred' )
-	local skins = NOTESKIN:GetNoteSkinNames()
-
-	for i = 1, #mods do
-		for j = 1, #skins do
-			if string.lower( mods[i] ) == string.lower( skins[j] ) then
-			   return skins[j];
-			end
-		end
-	end
+	-- Ask for the noteskin directly: the mods list leaves out the default
+	-- noteskin (rio-3d), so searching it fell back to StepMania's "default".
+	return GAMESTATE:GetPlayerState(p):GetPlayerOptions('ModsLevel_Preferred'):NoteSkin()
 end
 --Yes it's a global var, but don't worry because it will hopefully always be overwritten
 highlightedNoteSkin = CurrentNoteSkin(player);
@@ -224,28 +217,25 @@ t[#t+1] = Def.ActorFrame{
 		--[[Def.Quad{
 			InitCommand=cmd(setsize,50,50;diffuse,Color("HoloBlue"));
 		};]]
-		LoadFont("facu/_zona pro bold 20px")..{
-			Text=THEME:GetString("OptionNames","Speed");
-			InitCommand=cmd(y,-17;zoom,.6);
-			
-		};
-		LoadFont("monsterrat/_montserrat semi bold 60px")..{								--SPEEDMOD Display
-			InitCommand=cmd(y,5;zoom,0.6;maxwidth,75;skewx,-0.25;diffuse,Color("White"));
+		-- Speed as two lines, like the BGA block next to it, so it isn't
+		-- squeezed: the kind on top (AV / C / X), the number below.
+		LoadFont("monsterrat/_montserrat semi bold 60px")..{
+			InitCommand=cmd(y,-25/2+2;zoom,0.4;skewx,-0.25;maxwidth,120;diffuse,Color("White"));
 			OnCommand=function(self)
-				local xmod = GAMESTATE:GetPlayerState(player):GetCurrentPlayerOptions():XMod();
-				local cmod = GAMESTATE:GetPlayerState(player):GetCurrentPlayerOptions():CMod();
-				local mmod = GAMESTATE:GetPlayerState(player):GetCurrentPlayerOptions():MMod();
-				local curmod;
-				if cmod then
-					curmod = "C"..cmod
-					--speedvalue = cmod
-				elseif mmod then
-					curmod = "AV"..mmod
-					--speedvalue = mmod
-				else
-					curmod = xmod.."X"
-				end;
-				self:settext(curmod);
+				local po = GAMESTATE:GetPlayerState(player):GetCurrentPlayerOptions();
+				if po:CMod() then self:settext("C")
+				elseif po:MMod() then self:settext("AV")
+				else self:settext("SPEED") end;
+			end;
+		};
+		LoadFont("monsterrat/_montserrat semi bold 60px")..{
+			InitCommand=cmd(y,25/2-2;zoom,0.4;skewx,-0.25;maxwidth,130;diffuse,Color("White"));
+			OnCommand=function(self)
+				local po = GAMESTATE:GetPlayerState(player):GetCurrentPlayerOptions();
+				local cmod, mmod = po:CMod(), po:MMod();
+				if cmod then self:settext(string.format("%d", cmod))
+				elseif mmod then self:settext(string.format("%d", mmod))
+				else self:settext(string.format("%gX", po:XMod())) end;
 			end;
 		};
 	};

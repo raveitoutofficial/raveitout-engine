@@ -42,17 +42,9 @@ local t = Def.ActorFrame{
 
 --TODO: This was written before Noteskin() was a function, there is no reason to have this function still
 local function CurrentNoteSkin(p)
-	local state = GAMESTATE:GetPlayerState(p)
-	local mods = state:GetPlayerOptionsArray( 'ModsLevel_Preferred' )
-	local skins = NOTESKIN:GetNoteSkinNames()
-
-	for i = 1, #mods do
-		for j = 1, #skins do
-			if string.lower( mods[i] ) == string.lower( skins[j] ) then
-			   return skins[j];
-			end
-		end
-	end
+	-- Ask for the noteskin directly: the mods list leaves out the default
+	-- noteskin (rio-3d), so searching it fell back to StepMania's "default".
+	return GAMESTATE:GetPlayerState(p):GetPlayerOptions('ModsLevel_Preferred'):NoteSkin()
 end
 
 --OpList
