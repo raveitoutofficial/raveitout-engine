@@ -2,6 +2,8 @@
 
 `Themes/RaveItOut-SD-mipmaps` is **generated** from the HD theme `Themes/RaveItOut`.
 Never edit it by hand: change the HD theme (the only master art) or `overlay/`, then regenerate.
+The generated theme is committed too, so a fresh checkout works without running the script.
+After changing the HD theme, regenerate and commit `Themes/RaveItOut-SD-mipmaps` along with it.
 
 ## Regenerate
 

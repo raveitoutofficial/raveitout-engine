@@ -1,0 +1,2 @@
+Generated from Themes/RaveItOut by Utils/RaveItOut-SD/make_sd_theme.py.
+Do not edit here: change the HD theme or Utils/RaveItOut-SD/overlay and rerun.
